@@ -1,21 +1,17 @@
-name: Deploy Frontend to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -23,17 +19,17 @@ jobs:
           node-version: '18'
 
       - name: Install Dependencies
+        working-directory: frontend
         run: |
-          cd frontend
-          npm install
+          npm install --legacy-peer-deps
 
       - name: Build
+        working-directory: frontend
         run: |
-          cd frontend
-          CI=false npm run build
+          npm run build
 
-      - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          folder: frontend/build
-          branch: gh-pages 
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/build 
