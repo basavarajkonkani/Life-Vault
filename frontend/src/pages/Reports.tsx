@@ -1,6 +1,18 @@
 import React from 'react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend, PieLabelRenderProps } from 'recharts';
 import { Download, FileText, TrendingUp } from 'lucide-react';
+
+interface AssetAllocation {
+  name: string;
+  value: number;
+  amount: number;
+  color: string;
+}
+
+interface MonthlyData {
+  month: string;
+  value: number;
+}
 
 const Reports: React.FC = () => {
   // Mock data
@@ -44,6 +56,12 @@ const Reports: React.FC = () => {
   };
 
   const totalValue = assetAllocation.reduce((sum, asset) => sum + asset.amount, 0);
+
+  // Add custom label renderer
+  const renderCustomLabel = (props: PieLabelRenderProps) => {
+    const { name, value } = props;
+    return `${name}: ${value}%`;
+  };
 
   return (
     <div className="space-y-6">
@@ -119,9 +137,9 @@ const Reports: React.FC = () => {
                   cy="50%"
                   outerRadius={100}
                   dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}%`}
+                  label={renderCustomLabel}
                 >
-                  {assetAllocation.map((entry, index) => (
+                  {assetAllocation.map((entry: AssetAllocation, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -161,7 +179,7 @@ const Reports: React.FC = () => {
             <BarChart data={performanceData}>
               <XAxis dataKey="month" />
               <YAxis 
-                tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                tickFormatter={(value: number) => `₹${(value / 100000).toFixed(1)}L`}
               />
               <Bar dataKey="value" fill="#1E3A8A" />
             </BarChart>

@@ -55,36 +55,6 @@ export const dashboardAPI = {
     api.get('/dashboard/nominees'),
 };
 
-// Assets API
-export const assetsAPI = {
-  getAll: () => 
-    api.get('/dashboard/assets'),
-  
-  create: (assetData: any) => 
-    api.post('/assets', assetData),
-  
-  update: (id: string, assetData: any) => 
-    api.put(`/assets/${id}`, assetData),
-  
-  delete: (id: string) => 
-    api.delete(`/assets/${id}`),
-};
-
-// Nominees API
-export const nomineesAPI = {
-  getAll: () => 
-    api.get('/dashboard/nominees'),
-  
-  create: (nomineeData: any) => 
-    api.post('/nominees', nomineeData),
-  
-  update: (id: string, nomineeData: any) => 
-    api.put(`/nominees/${id}`, nomineeData),
-  
-  delete: (id: string) => 
-    api.delete(`/nominees/${id}`),
-};
-
 // Vault API
 export const vaultAPI = {
   getRequests: () => 
@@ -95,20 +65,6 @@ export const vaultAPI = {
   
   updateStatus: (id: string, status: string, notes?: string) => 
     api.put(`/vault/requests/${id}`, { status, notes }),
-};
-
-// File Upload API
-export const uploadAPI = {
-  uploadFile: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    return api.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
 };
 
 // Admin API

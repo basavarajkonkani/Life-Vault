@@ -1,18 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, PieLabelRenderProps } from 'recharts';
 import { Plus, Users, Lock, BookOpen, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../services/api';
+
+interface AssetAllocation {
+  name: string;
+  value: number;
+  amount: number;
+  color: string;
+}
+
+interface DashboardData {
+  totalAssets: number;
+  totalNominees: number;
+  netWorth: number;
+  assetAllocation: AssetAllocation[];
+  recentActivity: Array<{
+    id: number;
+    type: string;
+    description: string;
+    timestamp: Date;
+    status: 'success' | 'info' | 'warning';
+  }>;
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   
   // State for dashboard data
-  const [dashboardData, setDashboardData] = useState({
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalAssets: 0,
     totalNominees: 0,
     netWorth: 0,
-    assetAllocation: [] as Array<{ name: string; value: number; amount: number; color: string }>,
+    assetAllocation: [] as AssetAllocation[],
     recentActivity: [] as Array<any>
   });
   const [loading, setLoading] = useState(true);
@@ -62,6 +83,12 @@ const Dashboard: React.FC = () => {
     { label: 'Vault', icon: Lock, action: () => navigate('/vault') },
     { label: 'Claim Guides', icon: BookOpen, action: () => navigate('/claim-guides') },
   ];
+
+  // Update the Pie chart label
+  const renderCustomLabel = (props: PieLabelRenderProps) => {
+    const { name, value } = props;
+    return `${name}: ${value}%`;
+  };
 
   if (loading) {
     return (
@@ -128,9 +155,9 @@ const Dashboard: React.FC = () => {
                   cy="50%"
                   outerRadius={100}
                   dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}%`}
+                  label={renderCustomLabel}
                 >
-                  {assetAllocation.map((entry: any, index: number) => (
+                  {assetAllocation.map((entry: AssetAllocation, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
