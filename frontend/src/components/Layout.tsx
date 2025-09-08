@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
+import { Building2, 
   Menu, 
   X, 
   Home, 
@@ -38,6 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, navigationIte
       Lock,
       BookOpen,
       Settings,
+      Building2,
     };
     const IconComponent = icons[iconName] || Home;
     return <IconComponent className="w-5 h-5" />;

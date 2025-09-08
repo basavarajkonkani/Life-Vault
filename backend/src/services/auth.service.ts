@@ -14,7 +14,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(createUserDto: CreateUserDto): Promise<{ user: User; token: string }> {
+  private excludeSensitiveData(user: User): Omit<User, 'pinHash' | 'encryptionKey'> {
+    const { pinHash, encryptionKey, ...userWithoutSensitiveData } = user;
+    return userWithoutSensitiveData;
+  }
+
+  async register(createUserDto: CreateUserDto): Promise<{ user: Omit<User, 'pinHash' | 'encryptionKey'>; token: string }> {
     // Check if user already exists
     const existingUser = await this.userRepository.findOne({
       where: [
@@ -42,10 +47,9 @@ export class AuthService {
     const token = this.generateToken(savedUser);
 
     // Remove sensitive data
-    delete savedUser.pinHash;
-    delete savedUser.encryptionKey;
+    const userWithoutSensitiveData = this.excludeSensitiveData(savedUser);
 
-    return { user: savedUser, token };
+    return { user: userWithoutSensitiveData, token };
   }
 
   async sendOtp(loginDto: LoginDto): Promise<{ message: string; userId?: string }> {
@@ -90,7 +94,7 @@ export class AuthService {
     };
   }
 
-  async verifyPin(verifyPinDto: VerifyPinDto): Promise<{ user: User; token: string }> {
+  async verifyPin(verifyPinDto: VerifyPinDto): Promise<{ user: Omit<User, 'pinHash' | 'encryptionKey'>; token: string }> {
     // Find user by ID
     const user = await this.userRepository.findOne({
       where: { id: verifyPinDto.userId }
@@ -110,10 +114,9 @@ export class AuthService {
     const token = this.generateToken(user);
 
     // Remove sensitive data
-    delete user.pinHash;
-    delete user.encryptionKey;
+    const userWithoutSensitiveData = this.excludeSensitiveData(user);
 
-    return { user, token };
+    return { user: userWithoutSensitiveData, token };
   }
 
   private generateToken(user: User): string {
@@ -125,7 +128,7 @@ export class AuthService {
     return this.jwtService.sign(payload);
   }
 
-  async validateUser(userId: string): Promise<User> {
+  async validateUser(userId: string): Promise<Omit<User, 'pinHash' | 'encryptionKey'>> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isActive: true }
     });
@@ -134,9 +137,9 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    delete user.pinHash;
-    delete user.encryptionKey;
+    // Remove sensitive data
+    const userWithoutSensitiveData = this.excludeSensitiveData(user);
     
-    return user;
+    return userWithoutSensitiveData;
   }
 } 

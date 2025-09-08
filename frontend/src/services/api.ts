@@ -52,7 +52,7 @@ export const dashboardAPI = {
     api.get('/dashboard/assets'),
   
   getNominees: () => 
-    api.get('/dashboard/nominees'),
+    api.get('/nominees'),
 };
 
 // Assets API
@@ -73,7 +73,7 @@ export const assetsAPI = {
 // Nominees API
 export const nomineesAPI = {
   getAll: () => 
-    api.get('/dashboard/nominees'),
+    api.get('/nominees'),
   
   create: (nomineeData: any) => 
     api.post('/nominees', nomineeData),
@@ -118,3 +118,18 @@ export const adminAPI = {
 };
 
 export default api;
+
+// Trading Accounts API
+export const tradingAccountsAPI = {
+  getAll: () => 
+    api.get('/trading-accounts'),
+  
+  create: (tradingAccountData: any) => 
+    api.post('/trading-accounts', tradingAccountData),
+  
+  update: (id: string, tradingAccountData: any) => 
+    api.put(`/trading-accounts/${id}`, tradingAccountData),
+  
+  delete: (id: string) => 
+    api.delete(`/trading-accounts/${id}`),
+};

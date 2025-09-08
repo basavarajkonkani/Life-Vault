@@ -11,6 +11,7 @@ import Vault from './pages/Vault';
 import ClaimGuides from './pages/ClaimGuides';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import TradingAccounts from './pages/TradingAccounts';
 import './App.css';
 
 function App() {
@@ -76,6 +77,7 @@ function App() {
         return [
           ...baseItems,
           { path: '/assets', label: 'Assets', icon: 'TrendingUp' },
+          { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },          
           { path: '/nominees', label: 'Nominees', icon: 'Users' },
           { path: '/vault', label: 'Vault', icon: 'Lock' },
           { path: '/reports', label: 'Reports', icon: 'BookOpen' },
@@ -86,7 +88,7 @@ function App() {
           ...baseItems,
           { path: '/vault', label: 'Vault Requests', icon: 'Lock' },
           { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
-        ];
+          { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },        ];
       case 'admin':
         return [
           ...baseItems,
@@ -109,6 +111,7 @@ function App() {
           {user?.role === 'owner' && (
             <>
               <Route path="/assets" element={<Assets />} />
+              <Route path="/trading-accounts" element={<TradingAccounts />} />
               <Route path="/nominees" element={<Nominees />} />
               <Route path="/reports" element={<Reports />} />
             </>
@@ -116,7 +119,11 @@ function App() {
           
           {/* Nominee-only routes */}
           {user?.role === 'nominee' && (
-            <Route path="/claim-guides" element={<ClaimGuides />} />
+            <>
+              <Route path="/trading-accounts" element={<TradingAccounts />} />
+              <Route path="/nominees" element={<Nominees />} />
+              <Route path="/claim-guides" element={<ClaimGuides />} />
+            </>
           )}
           
           {/* Shared routes */}
