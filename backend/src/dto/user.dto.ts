@@ -1,11 +1,14 @@
-import { IsString, IsEmail, IsOptional, IsPhoneNumber, Length } from 'class-validator';
+import { IsEmail, IsString, IsOptional, IsEnum, Length, Matches } from 'class-validator';
+import { UserRole } from '../entities/user.entity';
 
 export class CreateUserDto {
   @IsString()
   @Length(2, 100)
   name: string;
 
-  @IsPhoneNumber('IN')
+  @IsString()
+  @Length(10, 15)
+  @Matches(/^\+?[1-9]\d{1,14}$/, { message: 'Phone number must be valid' })
   phone: string;
 
   @IsEmail()
@@ -17,6 +20,38 @@ export class CreateUserDto {
 
   @IsString()
   @Length(4, 4)
+  @Matches(/^\d{4}$/, { message: 'PIN must be exactly 4 digits' })
+  pin: string;
+
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
+}
+
+export class LoginDto {
+  @IsString()
+  @Length(10, 15)
+  phone: string;
+}
+
+export class VerifyOtpDto {
+  @IsString()
+  @Length(10, 15)
+  phone: string;
+
+  @IsString()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/, { message: 'OTP must be exactly 6 digits' })
+  otp: string;
+}
+
+export class VerifyPinDto {
+  @IsString()
+  userId: string;
+
+  @IsString()
+  @Length(4, 4)
+  @Matches(/^\d{4}$/, { message: 'PIN must be exactly 4 digits' })
   pin: string;
 }
 
@@ -33,39 +68,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   address?: string;
-}
 
-export class LoginDto {
-  @IsPhoneNumber('IN')
-  phone: string;
-}
-
-export class VerifyOtpDto {
-  @IsPhoneNumber('IN')
-  phone: string;
-
-  @IsString()
-  @Length(6, 6)
-  otp: string;
-}
-
-export class VerifyPinDto {
-  @IsString()
-  userId: string;
-
+  @IsOptional()
   @IsString()
   @Length(4, 4)
-  pin: string;
+  @Matches(/^\d{4}$/, { message: 'PIN must be exactly 4 digits' })
+  pin?: string;
 }
-
-export class UserResponseDto {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  address?: string;
-  isActive: boolean;
-  role: string;
-  createdAt: Date;
-  updatedAt: Date;
-} 

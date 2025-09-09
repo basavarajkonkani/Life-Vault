@@ -1,279 +1,294 @@
-# 🏦 LifeVault - Digital Nominee Helper
+# LifeVault - Digital Asset Management System
 
-**A secure digital inheritance and asset management platform built with React.js, Express.js, and Supabase.**
+A comprehensive digital asset management system built with React.js frontend and Node.js backend with PostgreSQL database integration.
 
-## 🎯 Project Overview
+## 🚀 Features
 
-LifeVault helps users securely store, track, and transfer asset information to nominees after death. Built with a government-like trustable design (DigiLocker style) in blue and white theme.
+- **Real-time Data**: Live PostgreSQL database integration with no mock data
+- **Authentication**: JWT-based authentication with OTP and PIN verification
+- **Asset Management**: CRUD operations for financial assets
+- **Nominee Management**: Manage beneficiaries and their allocations
+- **Vault System**: Secure document storage and access requests
+- **Trading Accounts**: Manage stock trading accounts
+- **Role-based Access**: Owner, Nominee, Admin, and Super-Admin roles
+- **Real-time Notifications**: Toast notifications for user feedback
+- **Loading States**: Proper loading indicators and error handling
+- **Responsive Design**: Mobile-friendly interface
 
-## 🚀 **Current Status: FULLY FUNCTIONAL + SUPABASE READY**
+## 🛠 Tech Stack
 
-### ✅ **Working Right Now**
-- **Frontend**: React.js + Tailwind CSS on `http://localhost:3001`
-- **Backend**: Express.js API on `http://localhost:3003`
-- **Authentication**: OTP (123456) + PIN (1234) login flow
-- **Dashboard**: Real data from backend API
-- **Assets & Nominees**: Full CRUD operations
+### Frontend
+- **React.js** with TypeScript
+- **Tailwind CSS** for styling
+- **React Router** for navigation
+- **Recharts** for data visualization
+- **Axios** for API calls
+- **Custom Hooks** for API state management
 
-### 🔄 **Two Backend Options Available**
+### Backend
+- **Node.js** with Express.js
+- **PostgreSQL** database
+- **JWT** authentication
+- **bcryptjs** for password hashing
+- **CORS** enabled for cross-origin requests
 
-#### **Option 1: In-Memory Backend (Currently Running)**
-- ✅ **Immediate use** - works right now
-- ✅ **Zero setup** - no database required
-- ✅ **Perfect for demo** - showcases all features
-- ❌ **Data lost on restart** - not persistent
-- 📁 **File**: `simple-backend.js`
+## 📋 Prerequisites
 
-#### **Option 2: Supabase Backend (Production Ready)**
-- ✅ **Persistent data** - survives server restarts
-- ✅ **Real authentication** - JWT + bcrypt hashing
-- ✅ **File uploads** - cloud storage
-- ✅ **Multi-user support** - isolated user data
-- ✅ **Production ready** - scalable and secure
-- 📁 **File**: `supabase-backend.js`
-- ⏱️ **Setup time**: ~12 minutes
+- Node.js (v16 or higher)
+- PostgreSQL (v12 or higher)
+- npm or yarn
 
-## 🏗️ **Architecture**
+## 🚀 Quick Start
 
-```
-Frontend (React.js)  ←→  Backend (Express.js)  ←→  Database (Option)
-     ↓                        ↓                      ↓
-- Tailwind CSS          - REST API              - In-Memory (Option 1)
-- Recharts              - JWT Auth              - Supabase PostgreSQL (Option 2)
-- React Router          - File Upload           - Supabase Storage (Option 2)
-- Axios API             - CORS Enabled          - Row Level Security (Option 2)
-```
+### 1. Clone and Install Dependencies
 
-## 🎨 **Features**
-
-### **Core Features (Working)**
-- 🔐 **Authentication**: Phone + OTP + PIN flow
-- 📊 **Dashboard**: Asset overview, net worth, charts
-- 💰 **Asset Management**: Add/edit/delete Bank, LIC, PF, Property, Stocks, Crypto
-- 👥 **Nominee Management**: Allocation percentages, executor roles
-- 🏦 **Vault Access**: Nominee login and death certificate upload
-- 📘 **Claim Guides**: Step-by-step guides for LIC, PF, Bank, Property
-- 📈 **Reports**: Analytics with charts and PDF export
-- ⚙️ **Settings**: Profile, security, notifications
-
-### **Additional Features (Supabase Only)**
-- 📁 **File Uploads**: Documents, death certificates
-- 👤 **User Registration**: Create new accounts
-- 🔒 **Data Persistence**: Real database storage
-- 🔍 **Audit Trail**: Complete change logging
-- 🚫 **User Isolation**: Each user sees only their data
-
-## 🚀 **Quick Start**
-
-### **Immediate Demo (No Setup)**
 ```bash
-# Frontend (already running)
-http://localhost:3001
+git clone <repository-url>
+cd Life-Vault
 
-# Backend API
-http://localhost:3003
+# Install backend dependencies
+cd backend
+npm install
 
-# Login Credentials
-Phone: Any number
-OTP: 123456
-PIN: 1234
+# Install frontend dependencies
+cd ../frontend
+npm install
 ```
 
-### **Production Setup (12 minutes)**
+### 2. Database Setup
+
 ```bash
-# 1. Follow the Supabase setup guide
-open SUPABASE_SETUP_GUIDE.md
+# Start PostgreSQL service
+# On macOS:
+brew services start postgresql
 
-# 2. Create Supabase project and get credentials
+# On Ubuntu:
+sudo systemctl start postgresql
 
-# 3. Create .env file with your credentials
-
-# 4. Start Supabase backend
-node supabase-backend.js
-
-# 5. Frontend automatically connects to new backend
+# Create database
+createdb lifevault
 ```
 
-## 📂 **Project Structure**
+### 3. Environment Configuration
 
-```
-Life-Vault/
-├── frontend/                    # React.js application
-│   ├── src/
-│   │   ├── components/         # Layout, Notification
-│   │   ├── pages/              # Dashboard, Assets, Nominees, etc.
-│   │   ├── services/           # API integration
-│   │   └── styles/             # Tailwind CSS
-│   └── public/
-├── backend/                     # NestJS (future expansion)
-├── simple-backend.js           # In-memory Express backend (current)
-├── supabase-backend.js         # Supabase Express backend (ready)
-├── supabase-schema.sql         # PostgreSQL database schema
-├── SUPABASE_SETUP_GUIDE.md     # Step-by-step Supabase setup
-├── MIGRATION_STATUS.md         # Migration overview
-└── package.json                # Monorepo configuration
-```
+Create `.env` file in the backend directory:
 
-## 🛠️ **Technology Stack**
-
-### **Frontend**
-- **React.js 18** - UI framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling with blue/white theme
-- **Recharts** - Data visualization
-- **React Router** - Navigation
-- **Axios** - API communication
-- **Lucide React** - Icons
-
-### **Backend (Current)**
-- **Express.js** - Web framework
-- **CORS** - Cross-origin requests
-- **JSON** - In-memory data storage
-
-### **Backend (Supabase)**
-- **Express.js** - Web framework
-- **Supabase Client** - Database and storage
-- **bcryptjs** - Password hashing
-- **jsonwebtoken** - JWT authentication
-- **multer** - File upload handling
-
-### **Database (Supabase)**
-- **PostgreSQL** - Primary database
-- **Supabase Storage** - File storage
-- **Row Level Security** - Data protection
-- **Real-time subscriptions** - Live updates
-
-## 🔐 **Security Features**
-
-### **Current (In-Memory)**
-- ✅ Input validation
-- ✅ CORS protection
-- ✅ Mock authentication flow
-
-### **Supabase Addition**
-- ✅ **JWT Authentication** - Secure sessions
-- ✅ **PIN Hashing** - bcrypt encryption
-- ✅ **Row Level Security** - Database-level protection
-- ✅ **User Isolation** - Each user sees only their data
-- ✅ **File Upload Security** - Type and size validation
-- ✅ **SQL Injection Protection** - Parameterized queries
-
-## 📊 **API Endpoints**
-
-### **Authentication**
 ```bash
-POST /api/auth/send-otp        # Send OTP to phone
-POST /api/auth/verify-otp      # Verify OTP code
-POST /api/auth/verify-pin      # Verify PIN and login
-POST /api/auth/register        # Create new user (Supabase only)
+cd backend
+cp .env.example .env
 ```
 
-### **Dashboard**
+Edit `.env` with your configuration:
+
+```env
+# Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/lifevault
+
+# JWT Configuration
+JWT_SECRET=your_super_secret_jwt_key_here_change_in_production
+JWT_EXPIRES_IN=7d
+
+# Server Configuration
+PORT=3001
+NODE_ENV=development
+```
+
+### 4. Start the Application
+
+#### Option 1: Using the startup script (Recommended)
 ```bash
-GET  /api/dashboard/stats      # Dashboard statistics
-GET  /api/dashboard/assets     # User assets
-GET  /api/dashboard/nominees   # User nominees
+./start-app.sh
 ```
 
-### **Assets**
+#### Option 2: Manual startup
 ```bash
-GET    /api/dashboard/assets   # List all assets
-POST   /api/assets             # Create new asset
-PUT    /api/assets/:id         # Update asset
-DELETE /api/assets/:id         # Delete asset
+# Terminal 1 - Start Backend
+cd backend
+node real-backend.js
+
+# Terminal 2 - Start Frontend
+cd frontend
+npm start
 ```
 
-### **Nominees**
+### 5. Access the Application
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001/api
+- **Health Check**: http://localhost:3001/api/health
+
+## 🔐 Demo Credentials
+
+For testing purposes, use these credentials:
+
+- **Phone**: +91 9876543210
+- **OTP**: 123456
+- **PIN**: 1234
+- **Role**: Owner
+
+## 📊 API Endpoints
+
+### Authentication
+- `POST /api/auth/send-otp` - Send OTP
+- `POST /api/auth/verify-otp` - Verify OTP
+- `POST /api/auth/verify-pin` - Verify PIN
+
+### Dashboard
+- `GET /api/dashboard/stats` - Get dashboard statistics
+
+### Assets
+- `GET /api/assets` - Get all assets
+- `POST /api/assets` - Create new asset
+- `PUT /api/assets/:id` - Update asset
+- `DELETE /api/assets/:id` - Delete asset
+
+### Nominees
+- `GET /api/nominees` - Get all nominees
+- `POST /api/nominees` - Create new nominee
+- `PUT /api/nominees/:id` - Update nominee
+- `DELETE /api/nominees/:id` - Delete nominee
+
+### Trading Accounts
+- `GET /api/trading-accounts` - Get all trading accounts
+- `POST /api/trading-accounts` - Create new trading account
+- `PUT /api/trading-accounts/:id` - Update trading account
+- `DELETE /api/trading-accounts/:id` - Delete trading account
+
+### Vault
+- `GET /api/vault/requests` - Get vault requests
+- `POST /api/vault/requests` - Submit vault request
+
+### File Upload
+- `POST /api/upload` - Upload files
+
+## 🗄 Database Schema
+
+The application automatically creates the following tables:
+
+- **users** - User accounts and authentication
+- **assets** - Financial assets and investments
+- **nominees** - Beneficiaries and their allocations
+- **vault_requests** - Document access requests
+- **trading_accounts** - Stock trading accounts
+
+## 🎨 Frontend Architecture
+
+### Components
+- **Layout** - Main application layout
+- **Notification** - Toast notification system
+- **Pages** - Individual page components
+
+### Hooks
+- **useApi** - Custom hook for API calls with loading states
+- **useApiMutation** - Custom hook for API mutations
+
+### Services
+- **api.ts** - Centralized API service with error handling
+- **NotificationContext** - Global notification state management
+
+## 🔧 Development
+
+### Backend Development
 ```bash
-GET    /api/dashboard/nominees # List all nominees
-POST   /api/nominees           # Create new nominee
-PUT    /api/nominees/:id       # Update nominee
-DELETE /api/nominees/:id       # Delete nominee
+cd backend
+npm run dev  # If you have nodemon installed
+# or
+node real-backend.js
 ```
 
-### **Files (Supabase Only)**
-```bash
-POST /api/upload              # Upload document
-```
-
-## 🧪 **Testing**
-
-### **Frontend Testing**
+### Frontend Development
 ```bash
 cd frontend
-npm test
+npm start
 ```
 
-### **API Testing**
+### Database Management
+```bash
+# Connect to database
+psql lifevault
+
+# View tables
+\dt
+
+# View data
+SELECT * FROM users;
+SELECT * FROM assets;
+```
+
+## 🧪 Testing
+
+### Manual Testing
+1. Start the application
+2. Login with demo credentials
+3. Test CRUD operations for assets and nominees
+4. Verify real-time data updates
+5. Test error handling and loading states
+
+### API Testing
 ```bash
 # Health check
-curl http://localhost:3003/api/health
+curl http://localhost:3001/api/health
 
-# Dashboard data
-curl http://localhost:3003/api/dashboard/stats
-
-# Authentication flow
-curl -X POST http://localhost:3003/api/auth/send-otp \
-  -H "Content-Type: application/json" \
-  -d '{"phone":"+91 9876543210"}'
+# Get assets (requires authentication)
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:3001/api/assets
 ```
 
-## 📖 **Documentation**
+## 🚨 Troubleshooting
 
-- 📘 **[Supabase Setup Guide](SUPABASE_SETUP_GUIDE.md)** - Complete migration guide
-- 📊 **[Migration Status](MIGRATION_STATUS.md)** - In-memory vs Supabase comparison
-- 🏗️ **[Backend Setup](BACKEND_SETUP.md)** - NestJS setup guide (advanced)
+### Common Issues
 
-## 🚀 **Deployment Options**
+1. **Database Connection Error**
+   - Ensure PostgreSQL is running
+   - Check DATABASE_URL in .env file
+   - Verify database exists
 
-### **Frontend Deployment**
-- **Vercel** - Recommended for React apps
-- **Netlify** - Alternative static hosting
-- **GitHub Pages** - Free option
+2. **Port Already in Use**
+   - Change PORT in .env file
+   - Kill existing processes: `lsof -ti:3001 | xargs kill`
 
-### **Backend Deployment**
-- **Railway** - Easy Express.js deployment
-- **Render** - Free tier available
-- **Heroku** - Traditional PaaS
-- **Supabase Edge Functions** - Serverless option
+3. **CORS Errors**
+   - Backend has CORS enabled for all origins
+   - Check if backend is running on correct port
 
-### **Database**
-- **Supabase** - Managed PostgreSQL (recommended)
-- **Railway PostgreSQL** - Alternative
-- **Render PostgreSQL** - Integrated option
+4. **Authentication Issues**
+   - Clear localStorage: `localStorage.clear()`
+   - Check JWT_SECRET in .env file
 
-## 🤝 **Contributing**
+### Logs
+- Backend logs are displayed in the terminal
+- Frontend errors are shown in browser console
+- Database logs can be viewed in PostgreSQL logs
 
-1. **Fork the repository**
-2. **Create feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit changes**: `git commit -m 'Add amazing feature'`
-4. **Push to branch**: `git push origin feature/amazing-feature`
-5. **Open Pull Request**
+## 📝 Environment Variables
 
-## 📄 **License**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://demo:demo@localhost:5432/lifevault` |
+| `JWT_SECRET` | Secret key for JWT tokens | `demo-secret` |
+| `JWT_EXPIRES_IN` | JWT token expiration | `7d` |
+| `PORT` | Backend server port | `3001` |
+| `NODE_ENV` | Environment mode | `development` |
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 🤝 Contributing
 
-## 🆘 **Support**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-### **For Demo/Testing**
-- Use the current setup - everything works out of the box
-- Login: Any phone + OTP: 123456 + PIN: 1234
+## 📄 License
 
-### **For Production**
-- Follow `SUPABASE_SETUP_GUIDE.md`
-- Create issues for bugs or feature requests
-- Check `MIGRATION_STATUS.md` for current capabilities
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+For support and questions:
+- Check the troubleshooting section
+- Review the API documentation
+- Check browser console for frontend errors
+- Check backend terminal for server errors
 
 ---
 
-## 🎯 **Current Status Summary**
-
-**✅ FULLY FUNCTIONAL**: Complete digital inheritance platform
-**✅ DEMO READY**: Works immediately without setup
-**✅ PRODUCTION READY**: Supabase backend available
-**✅ SECURE**: JWT auth, PIN hashing, RLS policies
-**✅ SCALABLE**: Cloud-native architecture
-**✅ DOCUMENTED**: Complete setup guides
-
-**🚀 Ready to use immediately or deploy to production!** 
+**Note**: This application uses demo data and credentials for development purposes. In production, implement proper security measures, use real SMS services for OTP, and secure your database connections.

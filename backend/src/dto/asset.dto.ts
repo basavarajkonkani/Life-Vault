@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, IsArray } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, IsArray, IsDateString } from 'class-validator';
 import { AssetCategory, AssetStatus } from '../entities/asset.entity';
 
 export class CreateAssetDto {
@@ -13,10 +13,6 @@ export class CreateAssetDto {
 
   @IsNumber()
   currentValue: number;
-
-  @IsOptional()
-  @IsEnum(AssetStatus)
-  status?: AssetStatus;
 
   @IsOptional()
   @IsString()
@@ -74,19 +70,3 @@ export class UpdateAssetDto {
   @IsString()
   nominee?: string;
 }
-
-export class AssetResponseDto {
-  id: string;
-  category: AssetCategory;
-  institution: string;
-  accountNumber: string;
-  currentValue: number;
-  status: AssetStatus;
-  notes?: string;
-  documents?: string[];
-  maturityDate?: Date;
-  nominee?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-} 

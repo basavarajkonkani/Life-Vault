@@ -1,63 +1,86 @@
 import React, { useEffect } from 'react';
-import { CheckCircle, X } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
 
-interface NotificationProps {
-  message: string;
-  show: boolean;
-  onClose: () => void;
-  type?: 'success' | 'error' | 'info';
+export interface NotificationProps {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message?: string;
+  duration?: number;
+  onClose: (id: string) => void;
 }
 
-const Notification: React.FC<NotificationProps> = ({ 
-  message, 
-  show, 
-  onClose, 
-  type = 'success' 
+const Notification: React.FC<NotificationProps> = ({
+  id,
+  type,
+  title,
+  message,
+  duration = 5000,
+  onClose,
 }) => {
   useEffect(() => {
-    if (show) {
+    if (duration > 0) {
       const timer = setTimeout(() => {
-        onClose();
-      }, 3000);
+        onClose(id);
+      }, duration);
+
       return () => clearTimeout(timer);
     }
-  }, [show, onClose]);
+  }, [id, duration, onClose]);
 
-  if (!show) return null;
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+      case 'warning':
+        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
+      case 'info':
+        return <AlertCircle className="w-5 h-5 text-blue-500" />;
+      default:
+        return <AlertCircle className="w-5 h-5 text-gray-500" />;
+    }
+  };
 
-  const bgColor = type === 'success' ? 'bg-green-50' : 
-                  type === 'error' ? 'bg-red-50' : 'bg-blue-50';
-  const textColor = type === 'success' ? 'text-green-800' : 
-                    type === 'error' ? 'text-red-800' : 'text-blue-800';
-  const iconColor = type === 'success' ? 'text-green-400' : 
-                    type === 'error' ? 'text-red-400' : 'text-blue-400';
+  const getBgColor = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-50 border-green-200';
+      case 'error':
+        return 'bg-red-50 border-red-200';
+      case 'warning':
+        return 'bg-yellow-50 border-yellow-200';
+      case 'info':
+        return 'bg-blue-50 border-blue-200';
+      default:
+        return 'bg-gray-50 border-gray-200';
+    }
+  };
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2">
-      <div className={`max-w-sm w-full ${bgColor} border border-opacity-20 rounded-lg shadow-lg`}>
-        <div className="p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <CheckCircle className={`h-6 w-6 ${iconColor}`} />
-            </div>
-            <div className="ml-3 w-0 flex-1">
-              <p className={`text-sm font-medium ${textColor}`}>
-                {message}
-              </p>
-            </div>
-            <div className="ml-4 flex-shrink-0 flex">
-              <button
-                className={`rounded-md inline-flex ${textColor} hover:${textColor.replace('800', '600')} focus:outline-none`}
-                onClick={onClose}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+    <div className={`max-w-sm w-full ${getBgColor()} border rounded-lg shadow-lg p-4 mb-4 transition-all duration-300 ease-in-out`}>
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          {getIcon()}
+        </div>
+        <div className="ml-3 flex-1">
+          <h4 className="text-sm font-medium text-gray-900">{title}</h4>
+          {message && (
+            <p className="mt-1 text-sm text-gray-600">{message}</p>
+          )}
+        </div>
+        <div className="ml-4 flex-shrink-0">
+          <button
+            onClick={() => onClose(id)}
+            className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition ease-in-out duration-150"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-export default Notification; 
+export default Notification;

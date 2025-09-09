@@ -50,8 +50,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     
     try {
       const response = await authAPI.sendOtp(phoneNumber, selectedRole!);
-      if (response.data.success) {
-        setUserId(response.data.userId);
+      if (response.success) {
+        setUserId(response.userId);
         setStep('otp');
       } else {
         alert('Failed to send OTP. Please try again.');
@@ -70,15 +70,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     
     try {
       const response = await authAPI.verifyOtp(phoneNumber, otp, selectedRole!);
-      if (response.data.success) {
-        setUserId(response.data.userId);
+      if (response.success) {
+        setUserId(response.userId);
         
-        if (response.data.requiresPin) {
+        if (response.requiresPin) {
           setStep('pin');
         } else {
-          localStorage.setItem('authToken', response.data.token);
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-          onLogin(true, response.data.user);
+          localStorage.setItem('authToken', response.token);
+          localStorage.setItem('user', JSON.stringify(response.user));
+          onLogin(response.user, response.token);
         }
       } else {
         alert('Invalid OTP. Use 123456 for demo');
@@ -97,10 +97,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     
     try {
       const response = await authAPI.verifyPin(userId, pin);
-      if (response.data.success) {
-        localStorage.setItem('authToken', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        onLogin(true, response.data.user);
+      if (response.success) {
+        localStorage.setItem('authToken', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        onLogin(response.user, response.token);
       } else {
         alert('Invalid PIN. Use 1234 for demo');
       }

@@ -8,6 +8,14 @@ import {
 } from 'typeorm';
 import { Asset } from './asset.entity';
 import { Nominee } from './nominee.entity';
+import { TradingAccount } from './trading-account.entity';
+
+export enum UserRole {
+  OWNER = 'owner',
+  NOMINEE = 'nominee',
+  ADMIN = 'admin',
+  SUPER_ADMIN = 'super-admin',
+}
 
 @Entity('users')
 export class User {
@@ -32,8 +40,12 @@ export class User {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @Column({ type: 'varchar', length: 20, default: 'user' })
-  role: string;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.OWNER,
+  })
+  role: UserRole;
 
   @Column({ type: 'text', nullable: true })
   encryptionKey: string; // User-specific encryption key
@@ -50,4 +62,7 @@ export class User {
 
   @OneToMany(() => Nominee, (nominee) => nominee.user)
   nominees: Nominee[];
-} 
+
+  @OneToMany(() => TradingAccount, (tradingAccount) => tradingAccount.user)
+  tradingAccounts: TradingAccount[];
+}

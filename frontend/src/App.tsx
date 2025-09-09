@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import OwnerDashboard from './pages/OwnerDashboard';
@@ -13,6 +14,32 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import TradingAccounts from './pages/TradingAccounts';
 import './App.css';
+
+// Navigation items for different user roles
+const getNavigationItems = (userRole: string) => {
+  const baseItems = [
+    { path: '/', label: 'Dashboard', icon: 'Home' },
+    { path: '/assets', label: 'Assets', icon: 'TrendingUp' },
+    { path: '/nominees', label: 'Nominees', icon: 'Users' },
+    { path: '/vault', label: 'Vault', icon: 'Lock' },
+    { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },
+  ];
+
+  if (userRole === 'admin' || userRole === 'super-admin') {
+    return [
+      ...baseItems,
+      { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
+      { path: '/reports', label: 'Reports', icon: 'TrendingUp' },
+      { path: '/settings', label: 'Settings', icon: 'Settings' },
+    ];
+  }
+
+  return [
+    ...baseItems,
+    { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
+    { path: '/settings', label: 'Settings', icon: 'Settings' },
+  ];
+};
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
@@ -36,102 +63,52 @@ function App() {
     }
   }, []);
 
-  const handleLogin = (authenticated: boolean, userData: any) => {
-    setIsAuthenticated(authenticated);
+  const handleLogin = (userData: any, token: string) => {
     setUser(userData);
+    setIsAuthenticated(true);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('authToken', token);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    setIsAuthenticated(false);
     setUser(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <NotificationProvider>
+        <Login onLogin={handleLogin} />
+      </NotificationProvider>
+    );
   }
 
-  // Role-based dashboard routing
-  const getDashboardComponent = () => {
-    switch (user?.role) {
-      case 'owner':
-        return <OwnerDashboard />;
-      case 'nominee':
-        return <NomineeDashboard />;
-      case 'admin':
-        return <AdminDashboard />;
-      default:
-        return <OwnerDashboard />;
-    }
-  };
-
-  // Role-based navigation items
-  const getNavigationItems = () => {
-    const baseItems = [
-      { path: '/', label: 'Dashboard', icon: 'Home' },
-    ];
-
-    switch (user?.role) {
-      case 'owner':
-        return [
-          ...baseItems,
-          { path: '/assets', label: 'Assets', icon: 'TrendingUp' },
-          { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },          
-          { path: '/nominees', label: 'Nominees', icon: 'Users' },
-          { path: '/vault', label: 'Vault', icon: 'Lock' },
-          { path: '/reports', label: 'Reports', icon: 'BookOpen' },
-          { path: '/settings', label: 'Settings', icon: 'Settings' },
-        ];
-      case 'nominee':
-        return [
-          ...baseItems,
-          { path: '/vault', label: 'Vault Requests', icon: 'Lock' },
-          { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
-          { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },        ];
-      case 'admin':
-        return [
-          ...baseItems,
-          { path: '/vault', label: 'Vault Management', icon: 'Lock' },
-          { path: '/settings', label: 'Admin Settings', icon: 'Settings' },
-        ];
-      default:
-        return baseItems;
-    }
-  };
+  const navigationItems = getNavigationItems(user?.role || 'owner');
 
   return (
-    <Router>
-      <Layout user={user} onLogout={handleLogout} navigationItems={getNavigationItems()}>
-        <Routes>
-          <Route path="/" element={getDashboardComponent()} />
-          <Route path="/dashboard" element={getDashboardComponent()} />
-          
-          {/* Owner-only routes */}
-          {user?.role === 'owner' && (
-            <>
-              <Route path="/assets" element={<Assets />} />
-              <Route path="/trading-accounts" element={<TradingAccounts />} />
-              <Route path="/nominees" element={<Nominees />} />
-              <Route path="/reports" element={<Reports />} />
-            </>
-          )}
-          
-          {/* Nominee-only routes */}
-          {user?.role === 'nominee' && (
-            <>
-              <Route path="/trading-accounts" element={<TradingAccounts />} />
-              <Route path="/nominees" element={<Nominees />} />
-              <Route path="/claim-guides" element={<ClaimGuides />} />
-            </>
-          )}
-          
-          {/* Shared routes */}
-          <Route path="/vault" element={<Vault />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <NotificationProvider>
+      <Router>
+        <Layout user={user} onLogout={handleLogout} navigationItems={navigationItems}>
+          <Routes>
+            <Route path="/" element={
+              user?.role === 'owner' ? <OwnerDashboard /> :
+              user?.role === 'nominee' ? <NomineeDashboard /> :
+              user?.role === 'admin' || user?.role === 'super-admin' ? <AdminDashboard /> :
+              <OwnerDashboard />
+            } />
+            <Route path="/assets" element={<Assets />} />
+            <Route path="/nominees" element={<Nominees />} />
+            <Route path="/vault" element={<Vault />} />
+            <Route path="/trading-accounts" element={<TradingAccounts />} />
+            <Route path="/claim-guides" element={<ClaimGuides />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Layout>
+      </Router>
+    </NotificationProvider>
   );
 }
 

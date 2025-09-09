@@ -65,11 +65,11 @@ const TradingAccounts: React.FC = () => {
           nomineesAPI.getAll()
         ]);
         
-        console.log('Trading accounts response:', accountsResponse.data);
-        console.log('Nominees response:', nomineesResponse.data);
+        console.log('Trading accounts response:', accountsResponse);
+        console.log('Nominees response:', nomineesResponse);
         
-        setTradingAccounts(accountsResponse.data || []);
-        setNominees(nomineesResponse.data || []);
+        setTradingAccounts(accountsResponse || []);
+        setNominees(nomineesResponse || []);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load data. Please check your connection and try again.');
@@ -110,12 +110,12 @@ const TradingAccounts: React.FC = () => {
         const response = await tradingAccountsAPI.update(editingAccount.id, accountData);
         setTradingAccounts((prev: TradingAccount[]) => 
           prev.map((account: TradingAccount) => 
-            account.id === editingAccount.id ? response.data : account
+            account.id === editingAccount.id ? response : account
           )
         );
       } else {
         const response = await tradingAccountsAPI.create(accountData);
-        setTradingAccounts((prev: TradingAccount[]) => [...prev, response.data]);
+        setTradingAccounts((prev: TradingAccount[]) => [...prev, response]);
       }
 
       setFormData({
@@ -143,7 +143,7 @@ const TradingAccounts: React.FC = () => {
       client_id: account.client_id,
       demat_number: account.demat_number,
       nominee_id: account.nominee_id || '',
-      current_value: account.current_value.toString(),
+      current_value: (account.current_value || 0).toString(),
       status: account.status
     });
     setEditingAccount(account);
@@ -180,7 +180,7 @@ const TradingAccounts: React.FC = () => {
 
   // Calculate summary statistics
   const totalAccounts = tradingAccounts.length;
-  const totalValue = tradingAccounts.reduce((sum, account) => sum + account.current_value, 0);
+  const totalValue = tradingAccounts.reduce((sum, account) => sum + (account?.current_value || 0), 0);
   const assignedNominees = new Set(tradingAccounts.filter(account => account.nominee_id).map(account => account.nominee_id)).size;
 
   if (loading) {
@@ -338,14 +338,6 @@ const TradingAccounts: React.FC = () => {
                 : 'No trading accounts have been assigned to you as a nominee yet.'
               }
             </p>
-            {isOwner && (
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="btn-primary"
-              >
-                Add Trading Account
-              </button>
-            )}
           </div>
         ) : (
           <div className="bg-white shadow-sm rounded-lg overflow-hidden">
@@ -411,7 +403,7 @@ const TradingAccounts: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-semibold text-green-600">
-                          {formatCurrency(account.current_value)}
+                          {formatCurrency(account.current_value || 0)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

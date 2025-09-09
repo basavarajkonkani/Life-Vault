@@ -1,27 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Upload, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { uploadAPI, vaultAPI } from '../services/api';
 
 interface VaultRequest {
   id: string;
   nomineeName: string;
   relationToDeceased: string;
-  requestDate: string;
+  requestDate?: string;
   status: 'pending' | 'under_review' | 'verified' | 'rejected';
   deathCertificate?: string;
 }
 
 const Vault: React.FC = () => {
   const [isNomineeView, setIsNomineeView] = useState(false);
-  const [vaultRequests] = useState<VaultRequest[]>([
-    {
-      id: '1',
-      nomineeName: 'Jane Doe',
-      relationToDeceased: 'Spouse',
-      requestDate: '2024-01-15',
-      status: 'verified',
-      deathCertificate: 'death_cert_john_doe.pdf'
-    }
-  ]);
+  const [vaultRequests, setVaultRequests] = useState<VaultRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     nomineeName: '',
@@ -31,6 +25,22 @@ const Vault: React.FC = () => {
     deathCertificate: null as File | null
   });
 
+  useEffect(() => {
+    const loadRequests = async () => {
+      setLoading(true);
+      try {
+        const res = await vaultAPI.getRequests();
+        setVaultRequests(res.data || []);
+      } catch (e) {
+        console.error('Failed to load vault requests', e);
+        setVaultRequests([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadRequests();
+  }, []);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -38,16 +48,35 @@ const Vault: React.FC = () => {
     }
   };
 
-  const handleSubmitRequest = (e: React.FormEvent) => {
+  const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.deathCertificate) {
+      alert('Please upload a death certificate');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const uploadRes = await uploadAPI.uploadFile(formData.deathCertificate);
+      const requestPayload = {
+        nomineeName: formData.nomineeName,
+        relationToDeceased: formData.relationToDeceased,
+        phoneNumber: formData.phoneNumber,
+        email: formData.email,
+        deathCertificate: uploadRes.data.fileName,
+      };
+      await vaultAPI.submitRequest(requestPayload);
     alert('Vault access request submitted successfully. You will be notified once reviewed.');
-    setFormData({
-      nomineeName: '',
-      relationToDeceased: '',
-      phoneNumber: '',
-      email: '',
-      deathCertificate: null
-    });
+      setFormData({ nomineeName: '', relationToDeceased: '', phoneNumber: '', email: '', deathCertificate: null });
+      const refreshed = await vaultAPI.getRequests();
+      setVaultRequests(refreshed.data || []);
+      setIsNomineeView(false);
+    } catch (error) {
+      console.error('Submit failed', error);
+      alert('Failed to submit request. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -200,17 +229,8 @@ const Vault: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-2">Required Documents:</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Original Death Certificate (Government issued)</li>
-                <li>• Valid ID proof of the nominee</li>
-                <li>• Relationship proof (if required)</li>
-              </ul>
-            </div>
-
-            <button type="submit" className="w-full btn-primary">
-              Submit Vault Access Request
+            <button type="submit" className="w-full btn-primary" disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit Vault Access Request'}
             </button>
           </form>
         </div>
@@ -240,7 +260,7 @@ const Vault: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-800">Pending Requests</h3>
-              <p className="text-2xl font-bold text-yellow-600">0</p>
+              <p className="text-2xl font-bold text-yellow-600">{loading ? '-' : vaultRequests.filter(v => v.status === 'pending').length}</p>
             </div>
             <Clock className="w-8 h-8 text-yellow-500" />
           </div>
@@ -249,7 +269,7 @@ const Vault: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-800">Under Review</h3>
-              <p className="text-2xl font-bold text-blue-600">0</p>
+              <p className="text-2xl font-bold text-blue-600">{loading ? '-' : vaultRequests.filter(v => v.status === 'under_review').length}</p>
             </div>
             <AlertCircle className="w-8 h-8 text-blue-500" />
           </div>
@@ -258,7 +278,7 @@ const Vault: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-800">Approved</h3>
-              <p className="text-2xl font-bold text-green-600">1</p>
+              <p className="text-2xl font-bold text-green-600">{loading ? '-' : vaultRequests.filter(v => v.status === 'verified').length}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
@@ -300,7 +320,7 @@ const Vault: React.FC = () => {
                     {request.relationToDeceased}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(request.requestDate).toLocaleDateString()}
+                    {request.requestDate ? new Date(request.requestDate).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">

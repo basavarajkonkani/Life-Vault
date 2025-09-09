@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import { CreateUserDto, LoginDto, VerifyOtpDto, VerifyPinDto } from '../dto/user.dto';
 
 @Injectable()
@@ -39,6 +39,7 @@ export class AuthService {
     const user = this.userRepository.create({
       ...createUserDto,
       pinHash,
+      role: createUserDto.role || UserRole.OWNER,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -142,4 +143,4 @@ export class AuthService {
     
     return userWithoutSensitiveData;
   }
-} 
+}

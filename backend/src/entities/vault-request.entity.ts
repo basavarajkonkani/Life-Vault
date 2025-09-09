@@ -44,7 +44,7 @@ export class VaultRequest {
   status: VaultRequestStatus;
 
   @Column({ type: 'text', nullable: true })
-  adminNotes: string; // Admin review notes
+  adminNotes: string | null; // Admin review notes
 
   @Column({ type: 'timestamp', nullable: true })
   reviewedAt: Date;
