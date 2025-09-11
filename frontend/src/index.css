@@ -1,36 +1,163 @@
+/* Performance Optimized and Responsive CSS */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  html {
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    /* Performance optimization */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
   body {
     @apply font-sans bg-gray-50 text-gray-900;
+    /* Performance optimizations */
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    /* Enable hardware acceleration */
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  /* Responsive font sizes */
+  @media (max-width: 768px) {
+    body {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    body {
+      font-size: 13px;
+      line-height: 1.4;
+    }
   }
 }
 
 @layer components {
   .card {
     @apply bg-white rounded-lg shadow-card p-6 hover:shadow-card-hover transition-shadow duration-200;
+    /* Performance optimization */
+    contain: layout style paint;
+    will-change: transform;
   }
   
   .btn-primary {
     @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    /* Touch optimization */
+    min-height: 44px;
+    min-width: 44px;
   }
   
   .btn-secondary {
     @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300 transition-colors duration-200;
+    /* Touch optimization */
+    min-height: 44px;
+    min-width: 44px;
   }
   
   .input-field {
     @apply block w-full rounded-lg border-gray-300 px-3 py-2 focus:border-primary-600 focus:ring-primary-600 focus:ring-1;
+    /* Touch optimization */
+    min-height: 44px;
+    font-size: 16px; /* Prevent zoom on iOS */
   }
   
   .sidebar-item {
     @apply flex items-center px-4 py-3 text-white hover:bg-primary-700 rounded-lg cursor-pointer transition-colors duration-200;
+    /* Touch optimization */
+    min-height: 44px;
   }
   
   .sidebar-item.active {
     @apply bg-primary-700;
+  }
+  
+  /* Responsive grid system */
+  .responsive-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    .responsive-grid {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+  }
+  
+  /* Mobile-first responsive design */
+  .container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    .container {
+      padding: 0 0.75rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .container {
+      padding: 0 0.5rem;
+    }
+  }
+  
+  /* Performance optimizations */
+  .optimize-rendering {
+    contain: layout style paint;
+    will-change: transform;
+  }
+  
+  .smooth-transition {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  /* Mobile touch optimizations */
+  @media (max-width: 768px) {
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    button, a, [role="button"] {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+  }
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+  
+  .block-mobile {
+    display: block !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hidden-desktop {
+    display: none !important;
+  }
+  
+  .block-desktop {
+    display: block !important;
   }
 }

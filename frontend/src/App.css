@@ -1,10 +1,17 @@
+/* Performance Optimized App.css */
 .App {
   text-align: center;
+  /* Enable hardware acceleration */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .App-logo {
   height: 40vmin;
   pointer-events: none;
+  /* Optimize for performance */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -22,10 +29,14 @@
   justify-content: center;
   font-size: calc(10px + 2vmin);
   color: white;
+  /* Performance optimizations */
+  contain: layout style paint;
 }
 
 .App-link {
   color: #61dafb;
+  /* Smooth transitions */
+  transition: color 0.2s ease-in-out;
 }
 
 @keyframes App-logo-spin {
@@ -34,5 +45,40 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Responsive Design Optimizations */
+@media (max-width: 768px) {
+  .App-header {
+    font-size: calc(8px + 2vmin);
+    padding: 1rem;
+  }
+  
+  .App-logo {
+    height: 30vmin;
+  }
+}
+
+@media (max-width: 480px) {
+  .App-header {
+    font-size: calc(6px + 2vmin);
+    padding: 0.5rem;
+  }
+  
+  .App-logo {
+    height: 25vmin;
+  }
+}
+
+/* Performance optimizations for mobile */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }

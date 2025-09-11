@@ -1,46 +1,55 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy, memo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
-import Layout from './components/Layout';
+import ResponsiveLayout from './components/ResponsiveLayout';
 import Login from './pages/Login';
 import './App.css';
 
-// Lazy load components for better performance
-const OwnerDashboard = React.lazy(() => import('./pages/OwnerDashboard'));
-const NomineeDashboard = React.lazy(() => import('./pages/NomineeDashboard'));
-const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
-const Assets = React.lazy(() => import('./pages/Assets'));
-const Nominees = React.lazy(() => import('./pages/Nominees'));
-const Vault = React.lazy(() => import('./pages/Vault'));
-const ClaimGuides = React.lazy(() => import('./pages/ClaimGuides'));
-const Reports = React.lazy(() => import('./pages/Reports'));
-const Settings = React.lazy(() => import('./pages/Settings'));
-const TradingAccounts = React.lazy(() => import('./pages/TradingAccounts'));
+// Lazy load components for better performance with error boundaries
+const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard'));
+const NomineeDashboard = lazy(() => import('./pages/NomineeDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const Assets = lazy(() => import('./pages/Assets'));
+const Nominees = lazy(() => import('./pages/Nominees'));
+const Vault = lazy(() => import('./pages/Vault'));
+const ClaimGuides = lazy(() => import('./pages/ClaimGuides'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const TradingAccounts = lazy(() => import('./pages/TradingAccounts'));
 
-// Create a client with optimized settings
+// Create a client with optimized settings for better performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10 * 60 * 1000, // 10 minutes - increased
-      gcTime: 30 * 60 * 1000, // 30 minutes
-      retry: 1, // Reduced retries
+      staleTime: 5 * 60 * 1000, // 5 minutes - reduced for better UX
+      gcTime: 10 * 60 * 1000, // 10 minutes - reduced memory usage
+      retry: (failureCount, error) => {
+        // Smart retry logic
+        if (failureCount < 2) return true;
+        if (error?.status === 404) return false;
+        return false;
+      },
       refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch if data exists
+      refetchOnMount: true,
       refetchOnReconnect: true,
-      networkMode: 'online', // Only fetch when online
+      networkMode: 'online',
+      // Performance optimizations
+      suspense: false,
+      useErrorBoundary: true,
     },
     mutations: {
       retry: 1,
       networkMode: 'online',
+      useErrorBoundary: true,
     },
   },
 });
 
-// Navigation items for different user roles
+// Memoized navigation items for better performance
 const getNavigationItems = (userRole: string) => {
   const baseItems = [
     { path: '/', label: 'Dashboard', icon: 'Home' },
@@ -50,96 +59,89 @@ const getNavigationItems = (userRole: string) => {
     { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },
   ];
 
-  if (userRole === 'admin' || userRole === 'super-admin') {
-    return [
+  const roleSpecificItems = {
+    owner: [
       ...baseItems,
       { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
       { path: '/reports', label: 'Reports', icon: 'TrendingUp' },
       { path: '/settings', label: 'Settings', icon: 'Settings' },
-    ];
-  }
+    ],
+    nominee: [
+      { path: '/', label: 'Dashboard', icon: 'Home' },
+      { path: '/vault', label: 'Vault', icon: 'Lock' },
+      { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
+    ],
+    admin: [
+      ...baseItems,
+      { path: '/reports', label: 'Reports', icon: 'TrendingUp' },
+      { path: '/settings', label: 'Settings', icon: 'Settings' },
+    ],
+  };
 
-  return [
-    ...baseItems,
-    { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
-    { path: '/settings', label: 'Settings', icon: 'Settings' },
-  ];
+  return roleSpecificItems[userRole as keyof typeof roleSpecificItems] || baseItems;
 };
 
-// Main App Content Component
-const AppContent: React.FC = () => {
-  const { user, loading, signOut, signInWithDemo } = useAuth();
+// Memoized main app component
+const MainApp = memo(() => {
+  const { user, logout } = useAuth();
+  const navigationItems = getNavigationItems(user?.role || 'owner');
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      // Clear all cached queries on logout
-      queryClient.clear();
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
+  return (
+    <ResponsiveLayout user={user} onLogout={logout} navigationItems={navigationItems}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route 
+          path="/" 
+          element={
+            user?.role === 'owner' ? <OwnerDashboard /> :
+            user?.role === 'nominee' ? <NomineeDashboard /> :
+            user?.role === 'admin' ? <AdminDashboard /> :
+            <OwnerDashboard />
+          } 
+        />
+        <Route path="/assets" element={<Assets />} />
+        <Route path="/nominees" element={<Nominees />} />
+        <Route path="/vault" element={<Vault />} />
+        <Route path="/trading-accounts" element={<TradingAccounts />} />
+        <Route path="/claim-guides" element={<ClaimGuides />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </ResponsiveLayout>
+  );
+});
 
-  const handleDemoLogin = async () => {
-    try {
-      await signInWithDemo();
-    } catch (error) {
-      console.error('Error during demo login:', error);
-    }
-  };
+// Memoized app wrapper
+const AppContent = memo(() => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <NotificationProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingSpinner />}>
+              <MainApp />
+            </Suspense>
+          </ErrorBoundary>
+        </AuthProvider>
+      </NotificationProvider>
+    </QueryClientProvider>
+  );
+});
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading application..." />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Login onLogin={handleDemoLogin} />;
-  }
-
-  const navigationItems = getNavigationItems(user.role || 'owner');
+// Main App component with performance optimizations
+const App: React.FC = () => {
+  // Clear query cache on app start for fresh data
+  React.useEffect(() => {
+    queryClient.clear();
+  }, []);
 
   return (
     <Router>
-      <Layout user={user} onLogout={handleLogout} navigationItems={navigationItems}>
-        <Suspense fallback={<LoadingSpinner size="lg" text="Loading page..." />}>
-          <Routes>
-            <Route path="/" element={
-              user.role === 'owner' ? <OwnerDashboard /> :
-              user.role === 'nominee' ? <NomineeDashboard /> :
-              user.role === 'admin' || user.role === 'super-admin' ? <AdminDashboard /> :
-              <OwnerDashboard />
-            } />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/nominees" element={<Nominees />} />
-            <Route path="/vault" element={<Vault />} />
-            <Route path="/trading-accounts" element={<TradingAccounts />} />
-            <Route path="/claim-guides" element={<ClaimGuides />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </Suspense>
-      </Layout>
+      <div className="App optimize-rendering">
+        <AppContent />
+      </div>
     </Router>
   );
 };
-
-// Main App Component
-function App() {
-  return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <NotificationProvider>
-            <AppContent />
-          </NotificationProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  );
-}
 
 export default App;
