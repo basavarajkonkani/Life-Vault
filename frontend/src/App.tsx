@@ -30,7 +30,7 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         // Smart retry logic
         if (failureCount < 2) return true;
-        if (error?.status === 404) return false;
+        if ((error as any)?.status === 404) return false;
         return false;
       },
       refetchOnWindowFocus: false,

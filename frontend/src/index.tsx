@@ -26,16 +26,16 @@ root.render(
   </React.StrictMode>
 );
 
-// Performance monitoring
+// Performance monitoring (simplified)
 reportWebVitals((metric) => {
-  console.log('Web Vitals:', metric);
+  console.log('Performance metric:', metric);
   
   // Send to analytics in production
   if (process.env.NODE_ENV === 'production') {
     // Example: Send to Google Analytics
     if (typeof gtag !== 'undefined') {
       gtag('event', metric.name, {
-        event_category: 'Web Vitals',
+        event_category: 'Performance',
         value: Math.round(metric.value),
         non_interaction: true,
       });

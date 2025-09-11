@@ -1,48 +1,25 @@
-import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
-
-// Performance monitoring utility
+// Performance monitoring utility (simplified version)
 export const initPerformanceMonitoring = () => {
   // Only run in production
   if (process.env.NODE_ENV !== 'production') return;
 
-  // Core Web Vitals monitoring
-  getCLS((metric) => {
-    console.log('CLS:', metric);
-    // Send to analytics service
-    sendToAnalytics('CLS', metric.value);
+  // Simple performance monitoring without web-vitals
+  console.log('Performance monitoring enabled');
+  
+  // Monitor page load time
+  window.addEventListener('load', () => {
+    const loadTime = performance.now();
+    console.log('Page load time:', loadTime, 'ms');
+    
+    // Send to analytics if available
+    if (typeof gtag !== 'undefined') {
+      gtag('event', 'page_load_time', {
+        event_category: 'Performance',
+        value: Math.round(loadTime),
+        non_interaction: true,
+      });
+    }
   });
-
-  getFID((metric) => {
-    console.log('FID:', metric);
-    sendToAnalytics('FID', metric.value);
-  });
-
-  getFCP((metric) => {
-    console.log('FCP:', metric);
-    sendToAnalytics('FCP', metric.value);
-  });
-
-  getLCP((metric) => {
-    console.log('LCP:', metric);
-    sendToAnalytics('LCP', metric.value);
-  });
-
-  getTTFB((metric) => {
-    console.log('TTFB:', metric);
-    sendToAnalytics('TTFB', metric.value);
-  });
-};
-
-// Send metrics to analytics (implement based on your analytics service)
-const sendToAnalytics = (metricName: string, value: number) => {
-  // Example: Send to Google Analytics, Mixpanel, etc.
-  if (typeof gtag !== 'undefined') {
-    gtag('event', metricName, {
-      event_category: 'Performance',
-      value: Math.round(value),
-      non_interaction: true,
-    });
-  }
 };
 
 // Performance optimization utilities
