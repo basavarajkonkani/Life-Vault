@@ -3,7 +3,7 @@ import { Shield, User, Users, Settings } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 interface LoginProps {
-  onLogin: (authenticated: boolean, user: any) => void;
+  onLogin?: (authenticated: boolean, user: any) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -129,7 +129,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         // Use the new authentication system
         await signInWithDemo();
-        onLogin(true, demoUser);
+        onLogin?.(true, demoUser);
       } else {
         setError('Invalid PIN. Use 1234 for demo.');
       }

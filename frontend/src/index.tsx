@@ -27,7 +27,7 @@ root.render(
 );
 
 // Performance monitoring (simplified)
-reportWebVitals((metric) => {
+reportWebVitals((metric: any) => {
   console.log('Performance metric:', metric);
   
   // Send to analytics in production
