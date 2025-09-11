@@ -25,29 +25,18 @@ const TradingAccounts = lazy(() => import('./pages/TradingAccounts'));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes - reduced for better UX
-      gcTime: 10 * 60 * 1000, // 10 minutes - reduced memory usage
-      retry: (failureCount, error) => {
-        // Smart retry logic
-        if (failureCount < 2) return true;
-        if ((error as any)?.status === 404) return false;
-        return false;
-      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
+      retry: 2,
       refetchOnWindowFocus: false,
       refetchOnMount: true,
       refetchOnReconnect: true,
-      networkMode: 'online',
-      // Performance optimizations
-      useErrorBoundary: true,
     },
     mutations: {
       retry: 1,
-      networkMode: 'online',
-      useErrorBoundary: true,
     },
   },
 });
-
 // Memoized navigation items for better performance
 const getNavigationItems = (userRole: string) => {
   const baseItems = [
