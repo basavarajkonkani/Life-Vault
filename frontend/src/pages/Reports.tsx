@@ -133,7 +133,7 @@ const Reports: React.FC = () => {
                   cy="50%"
                   outerRadius={100}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                  label={({ name }) => name}
                 >
                   {assetAllocation.map((entry: AssetAllocation, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
