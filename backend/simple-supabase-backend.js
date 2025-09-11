@@ -154,6 +154,19 @@ const validateTradingAccountData = (data) => {
 };
 
 // Routes
+app.get('/api/', (req, res) => {
+  res.json({ message: 'LifeVault API is running!', endpoints: [
+    '/api/health',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/dashboard/stats',
+    '/api/dashboard/batch',
+    '/api/assets',
+    '/api/nominees',
+    '/api/trading-accounts',
+    '/api/vault-requests'
+  ], timestamp: new Date().toISOString() });
+});
 app.get('/api/health', (req, res) => {
   res.json({ message: 'LifeVault Backend is running!', timestamp: new Date().toISOString() });
 });
