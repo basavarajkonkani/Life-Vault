@@ -1,6 +1,3 @@
-declare global {
-  function gtag(...args: any[]): void;
-}
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
@@ -9,6 +6,10 @@ import reportWebVitals from './reportWebVitals';
 import { initPerformanceMonitoring, optimizeImages, preloadCriticalResources } from './utils/performance';
 
 // Performance optimizations
+
+declare global {
+  function gtag(...args: any[]): void;
+}
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
