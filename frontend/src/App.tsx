@@ -38,7 +38,6 @@ const queryClient = new QueryClient({
       refetchOnReconnect: true,
       networkMode: 'online',
       // Performance optimizations
-      suspense: false,
       useErrorBoundary: true,
     },
     mutations: {
