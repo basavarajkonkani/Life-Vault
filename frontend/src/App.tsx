@@ -71,11 +71,11 @@ const getNavigationItems = (userRole: string) => {
 
 // Memoized main app component
 const MainApp = memo(() => {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const navigationItems = getNavigationItems(user?.role || 'owner');
 
   return (
-    <ResponsiveLayout user={user} onLogout={logout} navigationItems={navigationItems}>
+    <ResponsiveLayout user={user} onLogout={signOut} navigationItems={navigationItems}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route 
