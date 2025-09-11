@@ -35,7 +35,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const newNotification: NotificationProps = {
       ...notification,
       id,
-      onClose: removeNotification,
+      onClose: () => removeNotification(id),
     };
     
     setNotifications(prev => [...prev, newNotification]);

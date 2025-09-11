@@ -1,22 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Upload, Eye, X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { assetsAPI, uploadAPI } from '../services/api';
-import { useApi, useApiMutation } from '../hooks/useApi';
+import { Plus, Upload, X, FileText, Trash2, Edit2, Save, XCircle } from 'lucide-react';
+import { useAssets } from '../hooks/queries/useAssets';
 import { useNotification } from '../contexts/NotificationContext';
-
-interface Asset {
-  id: string;
-  category: string;
-  institution: string;
-  accountNumber: string;
-  currentValue: number;
-  status: 'Active' | 'Inactive';
-  notes?: string;
-  documents: string[];
-  createdAt?: string;
-  updatedAt?: string;
-}
+import AssetSkeleton from '../components/skeletons/AssetSkeleton';
 
 interface AssetFormData {
   category: string;
@@ -31,9 +18,21 @@ interface AssetFormData {
 const Assets: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useNotification();
+
+  // Use React Query for assets
+  const { 
+    assets, 
+    isLoading, 
+    isError, 
+    error, 
+    refetch, 
+    createAsset, 
+    updateAsset, 
+    deleteAsset 
+  } = useAssets();
   
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [editingAsset, setEditingAsset] = useState<any>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -48,121 +47,25 @@ const Assets: React.FC = () => {
     documents: [],
   });
 
-  const categories = ['Bank', 'LIC', 'PF', 'Property', 'Stocks', 'Crypto', 'Mutual Funds', 'Bonds'];
+  // Check if we should show the add form
+  useEffect(() => {
+    const shouldShowAdd = searchParams.get('add') === 'true';
+    setShowAddForm(shouldShowAdd);
+  }, [searchParams]);
 
-  // Fetch assets using the custom hook
-  const { data: assets, loading, error, refetch } = useApi(
-    () => assetsAPI.getAll(),
-    {
-      onError: (error) => showError('Failed to load assets', error),
-    }
-  );
-
-  // Create asset mutation
-  const createAssetMutation = useApiMutation(
-    (assetData: Omit<AssetFormData, 'documents'> & { documents: string[] }) => 
-      assetsAPI.create({
-        ...assetData,
-        currentValue: parseFloat(assetData.currentValue)
-      }),
-    {
-      onSuccess: () => {
-        showSuccess('Asset created successfully');
-        setShowAddForm(false);
-        resetForm();
-        refetch();
-      },
-      onError: (error) => showError('Failed to create asset', error),
-    }
-  );
-
-  // Update asset mutation
-  const updateAssetMutation = useApiMutation(
-    ({ id, assetData }: { id: string; assetData: Omit<AssetFormData, 'documents'> & { documents: string[] } }) => 
-      assetsAPI.update(id, {
-        ...assetData,
-        currentValue: parseFloat(assetData.currentValue)
-      }),
-    {
-      onSuccess: () => {
-        showSuccess('Asset updated successfully');
-        setEditingAsset(null);
-        resetForm();
-        refetch();
-      },
-      onError: (error) => showError('Failed to update asset', error),
-    }
-  );
-
-  // Delete asset mutation
-  const deleteAssetMutation = useApiMutation(
-    (id: string) => assetsAPI.delete(id),
-    {
-      onSuccess: () => {
-        showSuccess('Asset deleted successfully');
-        refetch();
-      },
-      onError: (error) => showError('Failed to delete asset', error),
-    }
-  );
-
-  const resetForm = () => {
-    setFormData({
-      category: '',
-      institution: '',
-      accountNumber: '',
-      currentValue: '',
-      status: 'Active',
-      notes: '',
-      documents: [],
-    });
-    setSelectedFiles([]);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleEdit = (asset: Asset) => {
-    setEditingAsset(asset);
-    setFormData({
-      category: asset.category,
-      institution: asset.institution,
-      accountNumber: asset.accountNumber,
-      currentValue: asset.currentValue.toString(),
-      status: asset.status,
-      notes: asset.notes || '',
-      documents: asset.documents,
-    });
-    setShowAddForm(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this asset?')) {
-      await deleteAssetMutation.mutate(id);
+  const handleFileSelect = (files: FileList | null) => {
+    if (files) {
+      const fileArray = Array.from(files);
+      setSelectedFiles(prev => [...prev, ...fileArray]);
     }
-  };
-
-  const handleFileUpload = async (files: File[]) => {
-    setUploadingFiles(true);
-    try {
-      const uploadPromises = files.map(file => uploadAPI.uploadFile(file));
-      const uploadResults = await Promise.all(uploadPromises);
-      const fileUrls = uploadResults.map(result => result.url);
-      
-      setFormData(prev => ({
-        ...prev,
-        documents: [...prev.documents, ...fileUrls]
-      }));
-      
-      showSuccess('Files uploaded successfully');
-    } catch (error) {
-      showError('Failed to upload files', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setUploadingFiles(false);
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setSelectedFiles(prev => [...prev, ...files]);
-    handleFileUpload(files);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -181,97 +84,138 @@ const Assets: React.FC = () => {
     setDragActive(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const files = Array.from(e.dataTransfer.files);
-      setSelectedFiles(prev => [...prev, ...files]);
-      handleFileUpload(files);
+      handleFileSelect(e.dataTransfer.files);
     }
   };
 
-  const removeFile = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents.filter((_, i) => i !== index)
-    }));
+  const uploadFiles = async (files: File[]): Promise<string[]> => {
+    // Simulate file upload - replace with actual upload logic
+    return files.map(file => `https://example.com/uploads/${file.name}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const assetData = {
-      category: formData.category,
-      institution: formData.institution,
-      accountNumber: formData.accountNumber,
-      currentValue: formData.currentValue,
-      status: formData.status,
-      notes: formData.notes,
-      documents: formData.documents,
-    };
+    try {
+      setUploadingFiles(true);
+      
+      // Upload files if any
+      let documentUrls: string[] = [];
+      if (selectedFiles.length > 0) {
+        documentUrls = await uploadFiles(selectedFiles);
+      }
 
-    if (editingAsset) {
-      await updateAssetMutation.mutate({ id: editingAsset.id, assetData });
-    } else {
-      await createAssetMutation.mutate(assetData);
+      const assetData = {
+        category: formData.category,
+        institution: formData.institution,
+        accountNumber: formData.accountNumber,
+        currentValue: parseFloat(formData.currentValue),
+        status: formData.status,
+        notes: formData.notes,
+        documents: documentUrls
+      };
+
+      if (editingAsset) {
+        // Update existing asset
+        await updateAsset.mutateAsync({ id: editingAsset.id, ...assetData });
+        showSuccess('Asset updated successfully!');
+      } else {
+        // Create new asset
+        await createAsset.mutateAsync(assetData);
+        showSuccess('Asset created successfully!');
+      }
+
+      // Reset form and refresh data
+      setFormData({
+        category: '',
+        institution: '',
+        accountNumber: '',
+        currentValue: '',
+        status: 'Active',
+        notes: '',
+        documents: [],
+      });
+      setSelectedFiles([]);
+      setShowAddForm(false);
+      setEditingAsset(null);
+      
+    } catch (err) {
+      console.error('Error saving asset:', err);
+      showError('Failed to save asset. Please try again.');
+    } finally {
+      setUploadingFiles(false);
     }
+  };
+
+  const handleEdit = (asset: any) => {
+    setEditingAsset(asset);
+    setFormData({
+      category: asset.category || '',
+      institution: asset.institution || '',
+      accountNumber: asset.account_number || '',
+      currentValue: asset.current_value?.toString() || '',
+      status: asset.status || 'Active',
+      notes: asset.notes || '',
+      documents: asset.documents || [],
+    });
+    setShowAddForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this asset?')) {
+      try {
+        await deleteAsset.mutateAsync(id);
+        showSuccess('Asset deleted successfully!');
+      } catch (err) {
+        console.error('Error deleting asset:', err);
+        showError('Failed to delete asset. Please try again.');
+      }
+    }
+  };
+
+  const handleCancel = () => {
+    setShowAddForm(false);
+    setEditingAsset(null);
+    setFormData({
+      category: '',
+      institution: '',
+      accountNumber: '',
+      currentValue: '',
+      status: 'Active',
+      notes: '',
+      documents: [],
+    });
+    setSelectedFiles([]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-green-100 text-green-800';
-      case 'Inactive':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors: { [key: string]: string } = {
-      'Bank': 'bg-blue-100 text-blue-800',
-      'LIC': 'bg-green-100 text-green-800',
-      'PF': 'bg-purple-100 text-purple-800',
-      'Property': 'bg-yellow-100 text-yellow-800',
-      'Stocks': 'bg-indigo-100 text-indigo-800',
-      'Crypto': 'bg-orange-100 text-orange-800',
-      'Mutual Funds': 'bg-pink-100 text-pink-800',
-      'Bonds': 'bg-teal-100 text-teal-800',
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading assets...</p>
-        </div>
-      </div>
-    );
+  if (isLoading) {
+    return <AssetSkeleton />;
   }
 
-  if (error) {
+  if (isError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <X className="w-8 h-8 text-red-600" />
+          <div className="text-red-600 mb-4">
+            <p>Error loading assets: {error?.message}</p>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Assets</h3>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => refetch()}
-            className="btn-primary"
+          <button 
+            onClick={() => refetch()} 
+            className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
           >
-            Try Again
+            Retry
           </button>
         </div>
       </div>
@@ -279,289 +223,318 @@ const Assets: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
+          <p className="text-gray-600">Manage your financial assets and investments.</p>
+        </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Asset</span>
+        </button>
+      </div>
+
+      {/* Add/Edit Form */}
+      {showAddForm && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {editingAsset ? 'Edit Asset' : 'Add New Asset'}
+            </h2>
+            <button
+              onClick={handleCancel}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category *
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select Category</option>
+                  <option value="Bank">Bank Account</option>
+                  <option value="Fixed Deposit">Fixed Deposit</option>
+                  <option value="Mutual Fund">Mutual Fund</option>
+                  <option value="Stocks">Stocks</option>
+                  <option value="LIC">LIC Policy</option>
+                  <option value="Property">Property</option>
+                  <option value="Gold">Gold</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Institution *
+                </label>
+                <input
+                  type="text"
+                  name="institution"
+                  value={formData.institution}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="e.g., State Bank of India"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Account Number *
+                </label>
+                <input
+                  type="text"
+                  name="accountNumber"
+                  value={formData.accountNumber}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter account number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current Value *
+                </label>
+                <input
+                  type="number"
+                  name="currentValue"
+                  value={formData.currentValue}
+                  onChange={handleInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter current value"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Assets</h1>
-              <p className="mt-2 text-gray-600">
-                Manage your financial assets and investments
-              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notes
+              </label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Additional notes about this asset"
+              />
             </div>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="btn-primary flex items-center"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Add Asset
-            </button>
-          </div>
-        </div>
 
-        {/* Assets Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {assets?.map((asset: Asset) => (
-            <div key={asset.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center">
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(asset.category)}`}>
-                    {asset.category}
-                  </span>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(asset)}
-                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                    title="Edit"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(asset.id)}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Documents
+              </label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center ${
+                  dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600 mb-2">
+                  Drag and drop files here, or click to select
+                </p>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Select Files
+                </label>
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <h3 className="font-medium text-gray-900">{asset.institution}</h3>
-                  <p className="text-sm text-gray-600">{asset.accountNumber}</p>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(asset.currentValue)}
-                  </span>
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(asset.status)}`}>
-                    {asset.status}
-                  </span>
-                </div>
-
-                {asset.notes && (
-                  <p className="text-sm text-gray-600 line-clamp-2">{asset.notes}</p>
-                )}
-
-                {asset.documents && asset.documents.length > 0 && (
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Upload className="w-4 h-4 mr-1" />
-                    {asset.documents.length} document{asset.documents.length !== 1 ? 's' : ''}
+              {/* Selected Files */}
+              {selectedFiles.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Files:</h4>
+                  <div className="space-y-2">
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-700">{file.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
 
-        {/* Empty State */}
-        {assets?.length === 0 && (
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={uploadingFiles}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 transition-colors"
+              >
+                {uploadingFiles ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Uploading...</span>
+                  </>
+                ) : editingAsset ? (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Update Asset</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Add Asset</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Assets List */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Your Assets</h2>
+        </div>
+        
+        {assets.length === 0 ? (
           <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="w-8 h-8 text-gray-400" />
+            <div className="text-gray-400 mb-4">
+              <FileText className="w-12 h-12 mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No assets yet</h3>
-            <p className="text-gray-600 mb-6">Get started by adding your first asset.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No assets found</h3>
+            <p className="text-gray-600 mb-4">Get started by adding your first asset.</p>
             <button
               onClick={() => setShowAddForm(true)}
-              className="btn-primary"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
-              Add Asset
+              <Plus className="w-4 h-4" />
+              <span>Add Asset</span>
             </button>
           </div>
-        )}
-
-        {/* Add/Edit Form Modal */}
-        {showAddForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">
-                  {editingAsset ? 'Edit Asset' : 'Add New Asset'}
-                </h2>
-                
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Category *
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="input-field"
-                      required
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Institution *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.institution}
-                      onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                      className="input-field"
-                      placeholder="e.g., State Bank of India"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Account Number *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.accountNumber}
-                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                      className="input-field"
-                      placeholder="Enter account number"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Value *
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.currentValue}
-                      onChange={(e) => setFormData({ ...formData, currentValue: e.target.value })}
-                      className="input-field"
-                      placeholder="Enter current value"
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'Active' | 'Inactive' })}
-                      className="input-field"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      className="input-field"
-                      rows={3}
-                      placeholder="Additional notes..."
-                    />
-                  </div>
-
-                  {/* File Upload */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Documents
-                    </label>
-                    <div
-                      className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                        dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
-                      }`}
-                      onDragEnter={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDragOver={handleDrag}
-                      onDrop={handleDrop}
-                    >
-                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600 mb-2">
-                        Drag and drop files here, or click to select
-                      </p>
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        id="file-upload"
-                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                      />
-                      <label
-                        htmlFor="file-upload"
-                        className="btn-secondary cursor-pointer"
-                      >
-                        Choose Files
-                      </label>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {assets.map((asset) => (
+              <div key={asset.id} className="p-6 hover:bg-gray-50">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {asset.category}
+                      </h3>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        asset.status === 'Active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {asset.status}
+                      </span>
                     </div>
-
-                    {uploadingFiles && (
-                      <div className="flex items-center justify-center mt-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-600 mr-2" />
-                        <span className="text-sm text-gray-600">Uploading files...</span>
-                      </div>
+                    <p className="text-gray-600 mb-1">{asset.institution}</p>
+                    <p className="text-sm text-gray-500 mb-2">Account: {asset.account_number}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(asset.current_value)}
+                    </p>
+                    {asset.notes && (
+                      <p className="text-sm text-gray-600 mt-2">{asset.notes}</p>
                     )}
-
-                    {formData.documents.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {formData.documents.map((doc, index) => (
-                          <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                            <span className="text-sm text-gray-600 truncate">{doc}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeFile(index)}
-                              className="text-red-500 hover:text-red-700"
+                    {asset.documents && asset.documents.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Documents:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {asset.documents.map((doc, index) => (
+                            <a
+                              key={index}
+                              href={doc}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200"
                             >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
+                              <FileText className="w-3 h-3" />
+                              <span>Document {index + 1}</span>
+                            </a>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  <div className="flex space-x-3 pt-4">
+                  <div className="flex items-center space-x-2">
                     <button
-                      type="submit"
-                      className="flex-1 btn-primary"
-                      disabled={createAssetMutation.loading || updateAssetMutation.loading}
+                      onClick={() => handleEdit(asset)}
+                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Edit asset"
                     >
-                      {(createAssetMutation.loading || updateAssetMutation.loading) ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                          {editingAsset ? 'Updating...' : 'Creating...'}
-                        </>
-                      ) : (
-                        editingAsset ? 'Update Asset' : 'Add Asset'
-                      )}
+                      <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddForm(false);
-                        setEditingAsset(null);
-                        resetForm();
-                      }}
-                      className="flex-1 btn-secondary"
+                      onClick={() => handleDelete(asset.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Delete asset"
                     >
-                      Cancel
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </form>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
         )}
       </div>

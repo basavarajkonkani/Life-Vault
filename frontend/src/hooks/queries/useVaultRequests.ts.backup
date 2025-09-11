@@ -1,0 +1,139 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase, getUserIdSync, ensureDemoUser } from '../../lib/supabase';
+import { useAuth } from '../useAuth';
+
+interface VaultRequest {
+  id: string;
+  nominee_name: string;
+  relation_to_deceased: string;
+  phone_number: string;
+  email: string;
+  death_certificate_url: string | null;
+  status: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface VaultRequestInput {
+  nominee_name: string;
+  relation_to_deceased: string;
+  phone_number: string;
+  email: string;
+  death_certificate_url?: string | null;
+  status?: string;
+  notes?: string | null;
+}
+
+export const useVaultRequests = () => {
+  const queryClient = useQueryClient();
+  const { getUserId } = useAuth();
+  
+  // Get user ID with fallback
+  const userId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
+
+  // Fetch vault requests
+  const {
+    data: vaultRequests = [],
+    isLoading,
+    isError,
+    error,
+    refetch
+  } = useQuery<VaultRequest[]>({
+    queryKey: ['vaultRequests', userId],
+    queryFn: async () => {
+      if (!userId) {
+        console.error('No user ID available for vault requests query');
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Fetching vault requests for user ID:', userId);
+      const { data, error } = await supabase
+        .from('vault_requests')
+        .select('id, nominee_name, relation_to_deceased, phone_number, email, death_certificate_url, status, notes, created_at, updated_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching vault requests:', error);
+        throw error;
+      }
+      console.log('Vault requests fetched successfully:', data);
+      return data as VaultRequest[];
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 2,
+  });
+
+  // Create vault request mutation
+  const createVaultRequest = useMutation({
+    mutationFn: async (requestData: VaultRequestInput) => {
+      const currentUserId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
+      if (!currentUserId) {
+        console.error('No user ID available for create vault request');
+        throw new Error('User not authenticated');
+      }
+
+      console.log('Creating vault request for user ID:', currentUserId, 'with data:', requestData);
+      const { data, error } = await supabase
+        .from('vault_requests')
+        .insert([{
+          user_id: currentUserId,
+          ...requestData
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating vault request:', error);
+        throw error;
+      }
+      console.log('Vault request created successfully:', data);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vaultRequests', userId] });
+    },
+    onError: (error) => {
+      console.error('Create vault request mutation error:', error);
+    },
+  });
+
+  // Update vault request mutation
+  const updateVaultRequest = useMutation({
+    mutationFn: async ({ id, ...requestData }: { id: string } & Partial<VaultRequestInput>) => {
+      console.log('Updating vault request with ID:', id, 'with data:', requestData);
+      const { data, error } = await supabase
+        .from('vault_requests')
+        .update(requestData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating vault request:', error);
+        throw error;
+      }
+      console.log('Vault request updated successfully:', data);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vaultRequests', userId] });
+    },
+    onError: (error) => {
+      console.error('Update vault request mutation error:', error);
+    },
+  });
+
+  return {
+    vaultRequests,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    createVaultRequest,
+    updateVaultRequest,
+  };
+};

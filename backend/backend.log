@@ -1,24 +1,6 @@
-[dotenv@17.2.2] injecting env (12) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.2] injecting env (12) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
 ✅ Demo user already exists
 🚀 Supabase backend server running on http://localhost:3001
 📊 Database: Supabase PostgreSQL
 🔐 JWT Secret: Set
 🌐 Supabase URL: Connected
-📊 Fetched trading accounts for user: 22ce220b-e5a2-4a51-80ac-a7737c97decd
-📊 Fetched trading accounts for user: 22ce220b-e5a2-4a51-80ac-a7737c97decd
-Trading accounts fetch error: Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
-    at ServerResponse.setHeader (node:_http_outgoing:642:11)
-    at ServerResponse.header (/Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/node_modules/express/lib/response.js:684:10)
-    at ServerResponse.send (/Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/node_modules/express/lib/response.js:161:12)
-    at ServerResponse.json (/Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/node_modules/express/lib/response.js:250:15)
-    at /Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/supabase-backend.js:2326:9
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
-  code: 'ERR_HTTP_HEADERS_SENT'
-}
-Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
-    at ServerResponse.setHeader (node:_http_outgoing:642:11)
-    at ServerResponse.header (/Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/node_modules/express/lib/response.js:684:10)
-    at ServerResponse.send (/Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/node_modules/express/lib/response.js:161:12)
-    at ServerResponse.json (/Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/node_modules/express/lib/response.js:250:15)
-    at /Users/basavarajgm/Desktop/NIGHAN2/Life-Vault/backend/supabase-backend.js:2329:21
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)

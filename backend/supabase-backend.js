@@ -890,7 +890,21 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     }
 
     const totalAssets = assets.length;
-    const netWorth = assets.reduce((sum, asset) => sum + parseFloat(asset.current_value), 0);
+    
+    // Get trading accounts statistics
+    const { data: tradingAccounts, error: tradingAccountsError } = await supabase
+      .from('trading_accounts')
+      .select('broker_name, current_value')
+      .eq('user_id', userId)
+      .eq('status', 'Active');
+    
+    if (tradingAccountsError) {
+      throw tradingAccountsError;
+    }
+    
+    const totalTradingAccounts = tradingAccounts.length;    const assetsValue = assets.reduce((sum, asset) => sum + parseFloat(asset.current_value), 0);
+    const tradingAccountsValue = tradingAccounts.reduce((sum, account) => sum + parseFloat(account.current_value), 0);
+    const netWorth = assetsValue + tradingAccountsValue;
     
     // Get nominees count
     const { data: nominees, error: nomineesError } = await supabase
@@ -905,14 +919,18 @@ app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
     const totalNominees = nominees.length;
     
     // Format asset allocation
-    const assetAllocation = assets.map((asset, index) => ({
+    const assetAllocation = [...assets.map((asset, index) => ({
       name: asset.category,
       value: parseFloat(asset.current_value),
-      color: ['#1E3A8A', '#3B82F6', '#60A5FA', '#93C5FD'][index % 4]
-    }));
+      color: ['#1E3A8A', '#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE', '#EFF6FF', '#A78BFA'][index % 7]
+    })), ...tradingAccounts.map((account, index) => ({
+      name: `Trading Account (${account.broker_name})`,
+      value: parseFloat(account.current_value),
+      color: ['#1E3A8A', '#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE', '#EFF6FF', '#A78BFA'][(assets.length + index) % 7]
+    }))];
     
     res.json({
-      totalAssets,
+      totalAssets: totalAssets + totalTradingAccounts,
       totalNominees,
       netWorth,
       assetAllocation,

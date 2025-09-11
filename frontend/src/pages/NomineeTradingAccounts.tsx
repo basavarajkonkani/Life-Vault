@@ -1,40 +1,149 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, CreditCard, User, ExternalLink, FileText } from 'lucide-react';
-import { tradingAccountsAPI } from '../services/api';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { useTradingAccounts } from '../hooks/queries/useTradingAccounts';
+import { useNominees } from '../hooks/queries/useNominees';
+import { useNotification } from '../contexts/NotificationContext';
+import TradingAccountSkeleton from '../components/skeletons/TradingAccountSkeleton';
 
-interface TradingAccount {
-  id: string;
-  broker_name: string;
-  client_id: string;
-  demat_number: string;
-  nominee_id?: string;
-  current_value: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
+interface TradingAccountFormData {
+  brokerName: string;
+  clientId: string;
+  dematNumber: string;
+  nomineeId: string;
+  currentValue: string;
+  status: 'Active' | 'Inactive';
+  notes: string;
 }
 
 const NomineeTradingAccounts: React.FC = () => {
-  const [tradingAccounts, setTradingAccounts] = useState<TradingAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { showSuccess, showError } = useNotification();
 
-  // Fetch trading accounts assigned to the nominee
+  // Use React Query for trading accounts
+  const { 
+    tradingAccounts, 
+    isLoading, 
+    isError, 
+    error, 
+    refetch, 
+    createTradingAccount, 
+    updateTradingAccount, 
+    deleteTradingAccount 
+  } = useTradingAccounts();
+
+  // Use React Query for nominees
+  const { nominees } = useNominees();
+  
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+
+  const [formData, setFormData] = useState<TradingAccountFormData>({
+    brokerName: '',
+    clientId: '',
+    dematNumber: '',
+    nomineeId: '',
+    currentValue: '',
+    status: 'Active',
+    notes: '',
+  });
+
+  // Check if we should show the add form
   useEffect(() => {
-    const fetchTradingAccounts = async () => {
-      try {
-        const response = await tradingAccountsAPI.getAll();
-        // Filter accounts assigned to this nominee (in real app, this would be done by backend)
-        setTradingAccounts(response.data);
-      } catch (error) {
-        console.error('Error fetching trading accounts:', error);
-        setTradingAccounts([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const shouldShowAdd = searchParams.get('add') === 'true';
+    setShowAddForm(shouldShowAdd);
+  }, [searchParams]);
 
-    fetchTradingAccounts();
-  }, []);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const accountData = {
+        brokerName: formData.brokerName,
+        clientId: formData.clientId,
+        dematNumber: formData.dematNumber,
+        nomineeId: formData.nomineeId || null,
+        currentValue: parseFloat(formData.currentValue),
+        status: formData.status,
+        notes: formData.notes,
+      };
+
+      if (editingAccount) {
+        // Update existing account
+        await updateTradingAccount.mutateAsync({ id: editingAccount.id, ...accountData });
+        showSuccess('Trading account updated successfully!');
+      } else {
+        // Create new account
+        await createTradingAccount.mutateAsync(accountData);
+        showSuccess('Trading account created successfully!');
+      }
+
+      // Reset form and refresh data
+      setFormData({
+        brokerName: '',
+        clientId: '',
+        dematNumber: '',
+        nomineeId: '',
+        currentValue: '',
+        status: 'Active',
+        notes: '',
+      });
+      setShowAddForm(false);
+      setEditingAccount(null);
+      
+    } catch (err) {
+      console.error('Error saving trading account:', err);
+      showError('Failed to save trading account. Please try again.');
+    }
+  };
+
+  const handleEdit = (account: any) => {
+    setEditingAccount(account);
+    setFormData({
+      brokerName: account.broker_name || '',
+      clientId: account.client_id || '',
+      dematNumber: account.demat_number || '',
+      nomineeId: account.nominee_id || '',
+      currentValue: account.current_value?.toString() || '',
+      status: account.status || 'Active',
+      notes: account.notes || '',
+    });
+    setShowAddForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this trading account?')) {
+      try {
+        await deleteTradingAccount.mutateAsync(id);
+        showSuccess('Trading account deleted successfully!');
+      } catch (err) {
+        console.error('Error deleting trading account:', err);
+        showError('Failed to delete trading account. Please try again.');
+      }
+    }
+  };
+
+  const handleCancel = () => {
+    setShowAddForm(false);
+    setEditingAccount(null);
+    setFormData({
+      brokerName: '',
+      clientId: '',
+      dematNumber: '',
+      nomineeId: '',
+      currentValue: '',
+      status: 'Active',
+      notes: '',
+    });
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -44,157 +153,271 @@ const NomineeTradingAccounts: React.FC = () => {
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800';
-      case 'Closed': return 'bg-red-100 text-red-800';
-      case 'Suspended': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  if (isLoading) {
+    return <TradingAccountSkeleton />;
+  }
 
-  const handleClaimGuide = () => {
-    // Open claim guide in new tab
-    window.open('/claim-guides', '_blank');
-  };
-
-  if (loading) {
+  if (isError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading trading accounts...</p>
+          <div className="text-red-600 mb-4">
+            <p>Error loading trading accounts: {error?.message}</p>
+          </div>
+          <button 
+            onClick={() => refetch()} 
+            className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Building2 className="w-8 h-8 mr-3 text-blue-600" />
-                Trading & Demat Accounts
-              </h1>
-              <p className="mt-2 text-gray-600">
-                View trading accounts assigned to you as nominee
-              </p>
-            </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Nominee Trading Accounts</h1>
+          <p className="text-gray-600">Manage trading accounts assigned to nominees.</p>
+        </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Trading Account</span>
+        </button>
+      </div>
+
+      {/* Add/Edit Form */}
+      {showAddForm && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {editingAccount ? 'Edit Trading Account' : 'Add New Trading Account'}
+            </h2>
             <button
-              onClick={handleClaimGuide}
-              className="btn-primary flex items-center"
+              onClick={handleCancel}
+              className="text-gray-400 hover:text-gray-600"
             >
-              <FileText className="w-5 h-5 mr-2" />
-              Claim Guide
+              <X className="w-6 h-6" />
             </button>
           </div>
-        </div>
 
-        {/* Claim Instructions */}
-        <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <FileText className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-lg font-medium text-blue-900 mb-2">
-                Claim Process for Trading Accounts
-              </h3>
-              <div className="text-blue-800 space-y-2">
-                <p><strong>Step 1:</strong> Submit death certificate to the broker</p>
-                <p><strong>Step 2:</strong> Fill and submit Transmission Request Form (TRF)</p>
-                <p><strong>Step 3:</strong> Provide nominee ID proof and address proof</p>
-                <p><strong>Step 4:</strong> Complete KYC verification with broker</p>
-                <p><strong>Step 5:</strong> Transfer securities to your demat account</p>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Broker Name *
+                </label>
+                <input
+                  type="text"
+                  name="brokerName"
+                  value={formData.brokerName}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="e.g., Zerodha, Angel One"
+                />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client ID *
+                </label>
+                <input
+                  type="text"
+                  name="clientId"
+                  value={formData.clientId}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter client ID"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Demat Number *
+                </label>
+                <input
+                  type="text"
+                  name="dematNumber"
+                  value={formData.dematNumber}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter demat number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nominee
+                </label>
+                <select
+                  name="nomineeId"
+                  value={formData.nomineeId}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select Nominee (Optional)</option>
+                  {nominees.map((nominee) => (
+                    <option key={nominee.id} value={nominee.id}>
+                      {nominee.name} ({nominee.relation})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current Value *
+                </label>
+                <input
+                  type="number"
+                  name="currentValue"
+                  value={formData.currentValue}
+                  onChange={handleInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter current value"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notes
+              </label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Additional notes about this trading account"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
               <button
-                onClick={handleClaimGuide}
-                className="mt-4 text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
               >
-                View Detailed Claim Guide
-                <ExternalLink className="w-4 h-4 ml-1" />
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+              >
+                {editingAccount ? (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Update Account</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Add Account</span>
+                  </>
+                )}
               </button>
             </div>
-          </div>
+          </form>
         </div>
+      )}
 
-        {/* Trading Accounts Grid */}
+      {/* Trading Accounts List */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Trading Accounts</h2>
+        </div>
+        
         {tradingAccounts.length === 0 ? (
           <div className="text-center py-12">
-            <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Trading Accounts Assigned</h3>
-            <p className="text-gray-600">
-              No trading accounts have been assigned to you as a nominee yet.
-            </p>
+            <div className="text-gray-400 mb-4">
+              <Plus className="w-12 h-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No trading accounts found</h3>
+            <p className="text-gray-600 mb-4">Get started by adding your first trading account.</p>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Trading Account</span>
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="divide-y divide-gray-200">
             {tradingAccounts.map((account) => (
-              <div key={account.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-lg font-semibold text-gray-900">{account.broker_name}</h3>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(account.status)}`}>
+              <div key={account.id} className="p-6 hover:bg-gray-50">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {account.broker_name}
+                      </h3>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        account.status === 'Active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
                         {account.status}
                       </span>
                     </div>
+                    <p className="text-gray-600 mb-1">Client ID: {account.client_id}</p>
+                    <p className="text-sm text-gray-500 mb-2">Demat: {account.demat_number}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(account.current_value)}
+                    </p>
+                    {account.notes && (
+                      <p className="text-sm text-gray-600 mt-2">{account.notes}</p>
+                    )}
                   </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    <span className="font-medium">Client ID:</span>
-                    <span className="ml-2 font-mono">{account.client_id}</span>
-                  </div>
-                  
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Building2 className="w-4 h-4 mr-2" />
-                    <span className="font-medium">Demat:</span>
-                    <span className="ml-2 font-mono">{account.demat_number}</span>
-                  </div>
-                  
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-600">Current Value</span>
-                      <span className="text-lg font-bold text-green-600">
-                        {formatCurrency(account.current_value)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Read-only indicator */}
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <div className="flex items-center text-xs text-gray-500">
-                    <User className="w-3 h-3 mr-1" />
-                    <span>Read-only access as nominee</span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleEdit(account)}
+                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Edit trading account"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(account.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Delete trading account"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-
-        {/* Additional Information */}
-        <div className="mt-8 bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Important Information</h3>
-          <div className="space-y-3 text-sm text-gray-600">
-            <p>• You have read-only access to trading accounts assigned to you as a nominee</p>
-            <p>• To claim these accounts, follow the claim process outlined above</p>
-            <p>• Contact the respective brokers directly for account transfer procedures</p>
-            <p>• Keep all required documents ready for the claim process</p>
-            <p>• The claim process may take 15-30 days depending on the broker</p>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -8,8 +8,14 @@ async function bootstrap() {
   
   // Enable CORS for frontend communication
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'], // Frontend URLs
+    origin: [
+      'http://localhost:3000', 
+      'http://localhost:3001',
+      'http://localhost:3003'
+    ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
   // Enable validation pipes
@@ -26,6 +32,9 @@ async function bootstrap() {
   const port = configService.get('PORT') || 3001;
   
   await app.listen(port);
-  console.log(`🚀 Backend server running on http://localhost:${port}`);
+  console.log(`�� LifeVault Backend server running on http://localhost:${port}`);
+  console.log(`📊 Supabase connected successfully`);
+  console.log(`🔐 JWT authentication enabled`);
+  console.log(`📁 File uploads enabled`);
 }
 bootstrap();

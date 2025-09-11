@@ -1,66 +1,43 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AuditLog, AuditAction, AuditResource } from '../entities/audit-log.entity';
+import { SupabaseService } from './supabase.service';
+
+export enum AuditAction {
+  CREATE = 'CREATE',
+  READ = 'READ',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+}
+
+export enum AuditResource {
+  USER = 'USER',
+  ASSET = 'ASSET',
+  NOMINEE = 'NOMINEE',
+  TRADING_ACCOUNT = 'TRADING_ACCOUNT',
+  VAULT_REQUEST = 'VAULT_REQUEST',
+}
 
 @Injectable()
 export class AuditService {
   constructor(
-    @InjectRepository(AuditLog)
-    private readonly auditLogRepository: Repository<AuditLog>,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
-  async log(
-    action: AuditAction,
-    resource: AuditResource,
-    userId?: string,
-    resourceId?: string,
-    description?: string,
-    metadata?: Record<string, any>,
-    ipAddress?: string,
-    userAgent?: string,
-  ): Promise<void> {
-    const auditLog = this.auditLogRepository.create({
-      action,
-      resource,
-      userId,
-      resourceId,
-      description,
-      metadata,
-      ipAddress,
-      userAgent,
-    });
+  async log(action: AuditAction, resource: AuditResource, userId: string, details?: any): Promise<void> {
+    try {
+      const auditData = {
+        user_id: userId,
+        action: action,
+        resource: resource,
+        details: details || {},
+        timestamp: new Date().toISOString(),
+      };
 
-    await this.auditLogRepository.save(auditLog);
-  }
-
-  async getAuditLogs(
-    userId?: string,
-    resource?: AuditResource,
-    action?: AuditAction,
-    limit: number = 100,
-    offset: number = 0,
-  ): Promise<{ logs: AuditLog[]; total: number }> {
-    const queryBuilder = this.auditLogRepository.createQueryBuilder('auditLog')
-      .leftJoinAndSelect('auditLog.user', 'user')
-      .orderBy('auditLog.createdAt', 'DESC')
-      .limit(limit)
-      .offset(offset);
-
-    if (userId) {
-      queryBuilder.andWhere('auditLog.userId = :userId', { userId });
+      await this.supabaseService.getClient()
+        .from('audit_logs')
+        .insert(auditData);
+    } catch (error) {
+      // Log audit errors but don't throw to avoid breaking the main operation
+      console.error('Audit logging failed:', error);
     }
-
-    if (resource) {
-      queryBuilder.andWhere('auditLog.resource = :resource', { resource });
-    }
-
-    if (action) {
-      queryBuilder.andWhere('auditLog.action = :action', { action });
-    }
-
-    const [logs, total] = await queryBuilder.getManyAndCount();
-
-    return { logs, total };
   }
 }

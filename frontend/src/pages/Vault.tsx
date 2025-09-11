@@ -1,238 +1,188 @@
-import React, { useEffect, useState } from 'react';
-import { Upload, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import { uploadAPI, vaultAPI } from '../services/api';
+import React, { useState, useRef } from 'react';
+import { Upload, FileText, X, Send, AlertCircle } from 'lucide-react';
+import { useVaultRequests } from '../hooks/queries/useVaultRequests';
+import { useNotification } from '../contexts/NotificationContext';
+import { supabase } from '../lib/supabase';
 
-interface VaultRequest {
-  id: string;
+interface VaultRequestFormData {
   nomineeName: string;
   relationToDeceased: string;
-  requestDate?: string;
-  status: 'pending' | 'under_review' | 'verified' | 'rejected';
-  deathCertificate?: string;
+  phoneNumber: string;
+  email: string;
 }
 
 const Vault: React.FC = () => {
-  const [isNomineeView, setIsNomineeView] = useState(false);
-  const [vaultRequests, setVaultRequests] = useState<VaultRequest[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const { showSuccess, showError } = useNotification();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use React Query for vault requests
+  const { 
+    vaultRequests, 
+    isLoading, 
+    isError, 
+    error, 
+    refetch, 
+    createVaultRequest 
+  } = useVaultRequests();
+  
+  const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<VaultRequestFormData>({
     nomineeName: '',
     relationToDeceased: '',
     phoneNumber: '',
     email: '',
-    deathCertificate: null as File | null
   });
 
-  useEffect(() => {
-    const loadRequests = async () => {
-      setLoading(true);
-      try {
-        const res = await vaultAPI.getRequests();
-        setVaultRequests(res.data || []);
-      } catch (e) {
-        console.error('Failed to load vault requests', e);
-        setVaultRequests([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadRequests();
-  }, []);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFormData({ ...formData, deathCertificate: file });
+  const handleFileSelect = (file: File | null) => {
+    setSelectedFile(file);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
     }
   };
 
-  const handleSubmitRequest = async (e: React.FormEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!formData.deathCertificate) {
-      alert('Please upload a death certificate');
-      return;
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `vault-requests/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
     }
 
-    setSubmitting(true);
+    const { data: { publicUrl } } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
-      const uploadRes = await uploadAPI.uploadFile(formData.deathCertificate);
-      const requestPayload = {
+      setUploadingFile(true);
+      
+      let deathCertificateUrl: string | null = null;
+      if (selectedFile) {
+        deathCertificateUrl = await uploadFile(selectedFile);
+      }
+
+      const requestData = {
         nomineeName: formData.nomineeName,
         relationToDeceased: formData.relationToDeceased,
         phoneNumber: formData.phoneNumber,
         email: formData.email,
-        deathCertificate: uploadRes.data.fileName,
+        deathCertificateUrl: deathCertificateUrl,
       };
-      await vaultAPI.submitRequest(requestPayload);
-    alert('Vault access request submitted successfully. You will be notified once reviewed.');
-      setFormData({ nomineeName: '', relationToDeceased: '', phoneNumber: '', email: '', deathCertificate: null });
-      const refreshed = await vaultAPI.getRequests();
-      setVaultRequests(refreshed.data || []);
-      setIsNomineeView(false);
-    } catch (error) {
-      console.error('Submit failed', error);
-      alert('Failed to submit request. Please try again.');
+
+      await createVaultRequest.mutateAsync(requestData);
+      showSuccess('Vault request submitted successfully! Our team will review it shortly.');
+
+      // Reset form
+      setFormData({
+        nomineeName: '',
+        relationToDeceased: '',
+        phoneNumber: '',
+        email: '',
+      });
+      setSelectedFile(null);
+      setShowSubmitForm(false);
+      
+    } catch (err) {
+      console.error('Error submitting vault request:', err);
+      showError('Failed to submit vault request. Please try again.');
     } finally {
-      setSubmitting(false);
+      setUploadingFile(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="w-5 h-5 text-yellow-500" />;
-      case 'under_review':
-        return <AlertCircle className="w-5 h-5 text-blue-500" />;
-      case 'verified':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+  const handleCancel = () => {
+    setShowSubmitForm(false);
+    setFormData({
+      nomineeName: '',
+      relationToDeceased: '',
+      phoneNumber: '',
+      email: '',
+    });
+    setSelectedFile(null);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'bg-green-100 text-green-800';
       case 'rejected':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-gray-500" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
+        return 'bg-red-100 text-red-800';
       case 'pending':
-        return 'Pending Review';
-      case 'under_review':
-        return 'Under Review';
-      case 'verified':
-        return 'Verified - Vault Opened';
-      case 'rejected':
-        return 'Rejected';
+        return 'bg-yellow-100 text-yellow-800';
       default:
-        return 'Unknown';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  if (isNomineeView) {
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        {/* Nominee Access Header */}
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Nominee Vault Access</h1>
-          <p className="text-gray-600 mt-2">
-            Submit required documents to access the deceased's asset information
-          </p>
-          <button
-            onClick={() => setIsNomineeView(false)}
-            className="mt-4 text-primary-600 hover:text-primary-800 text-sm font-medium"
+          <div className="text-red-600 mb-4">
+            <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+            <p>Error loading vault requests: {error?.message}</p>
+          </div>
+          <button 
+            onClick={() => refetch()} 
+            className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
           >
-            ← Back to Main Vault
+            Retry
           </button>
-        </div>
-
-        {/* Request Form */}
-        <div className="card max-w-2xl mx-auto">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">
-            Vault Access Request
-          </h2>
-          
-          <form onSubmit={handleSubmitRequest} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.nomineeName}
-                  onChange={(e) => setFormData({ ...formData, nomineeName: e.target.value })}
-                  className="input-field"
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Relationship to Deceased
-                </label>
-                <select
-                  value={formData.relationToDeceased}
-                  onChange={(e) => setFormData({ ...formData, relationToDeceased: e.target.value })}
-                  className="input-field"
-                  required
-                >
-                  <option value="">Select Relationship</option>
-                  <option value="Spouse">Spouse</option>
-                  <option value="Child">Child</option>
-                  <option value="Parent">Parent</option>
-                  <option value="Sibling">Sibling</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  className="input-field"
-                  placeholder="+91 9876543210"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="input-field"
-                  placeholder="your.email@example.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Death Certificate Upload
-              </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-sm text-gray-600 mb-2">
-                  Click to upload or drag and drop the death certificate
-                </p>
-                <p className="text-xs text-gray-500 mb-4">
-                  PDF, JPG, PNG up to 10MB
-                </p>
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  id="death-certificate"
-                />
-                <label
-                  htmlFor="death-certificate"
-                  className="btn-secondary cursor-pointer inline-block"
-                >
-                  Choose File
-                </label>
-                {formData.deathCertificate && (
-                  <p className="text-sm text-green-600 mt-2">
-                    ✓ {formData.deathCertificate.name}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <button type="submit" className="w-full btn-primary" disabled={submitting}>
-              {submitting ? 'Submitting...' : 'Submit Vault Access Request'}
-            </button>
-          </form>
         </div>
       </div>
     );
@@ -243,151 +193,242 @@ const Vault: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Vault</h1>
-          <p className="text-gray-600">Secure access for nominees and executors</p>
+          <h1 className="text-3xl font-bold text-gray-900">Vault Requests</h1>
+          <p className="text-gray-600">Submit and track your vault access requests.</p>
         </div>
         <button
-          onClick={() => setIsNomineeView(true)}
-          className="btn-primary"
+          onClick={() => setShowSubmitForm(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
-          Nominee Access
+          <Send className="w-4 h-4" />
+          <span>Submit Request</span>
         </button>
       </div>
 
-      {/* Admin Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">Pending Requests</h3>
-              <p className="text-2xl font-bold text-yellow-600">{loading ? '-' : vaultRequests.filter(v => v.status === 'pending').length}</p>
-            </div>
-            <Clock className="w-8 h-8 text-yellow-500" />
+      {/* Submit Form */}
+      {showSubmitForm && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Submit Vault Request</h2>
+            <button
+              onClick={handleCancel}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">Under Review</h3>
-              <p className="text-2xl font-bold text-blue-600">{loading ? '-' : vaultRequests.filter(v => v.status === 'under_review').length}</p>
-            </div>
-            <AlertCircle className="w-8 h-8 text-blue-500" />
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">Approved</h3>
-              <p className="text-2xl font-bold text-green-600">{loading ? '-' : vaultRequests.filter(v => v.status === 'verified').length}</p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-500" />
-          </div>
-        </div>
-      </div>
 
-      {/* Recent Requests */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Vault Access Requests</h2>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nominee Name *
+                </label>
+                <input
+                  type="text"
+                  name="nomineeName"
+                  value={formData.nomineeName}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter nominee name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Relation to Deceased *
+                </label>
+                <select
+                  name="relationToDeceased"
+                  value={formData.relationToDeceased}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Select Relation</option>
+                  <option value="Spouse">Spouse</option>
+                  <option value="Child">Child</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Sibling">Sibling</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="+91 9876543210"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="nominee@example.com"
+                />
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Death Certificate
+              </label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center ${
+                  dragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600 mb-2">
+                  Drag and drop the death certificate here, or click to select
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Select File
+                </button>
+              </div>
+
+              {/* Selected File */}
+              {selectedFile && (
+                <div className="mt-4 flex items-center justify-between bg-gray-50 p-3 rounded">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">{selectedFile.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={uploadingFile}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 transition-colors"
+              >
+                {uploadingFile ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Submit Request</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Vault Requests List */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Your Vault Requests</h2>
+        </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nominee
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Relationship
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Request Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Documents
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {vaultRequests.map((request) => (
-                <tr key={request.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {request.nomineeName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {request.relationToDeceased}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {request.requestDate ? new Date(request.requestDate).toLocaleDateString() : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {getStatusIcon(request.status)}
-                      <span className="ml-2 text-sm text-gray-900">
-                        {getStatusText(request.status)}
+        {vaultRequests.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <FileText className="w-12 h-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No vault requests found</h3>
+            <p className="text-gray-600 mb-4">Submit your first vault request to get started.</p>
+            <button
+              onClick={() => setShowSubmitForm(true)}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Send className="w-4 h-4" />
+              <span>Submit Request</span>
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {vaultRequests.map((request) => (
+              <div key={request.id} className="p-6 hover:bg-gray-50">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {request.nominee_name}
+                      </h3>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(request.status)}`}>
+                        {request.status}
                       </span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {request.deathCertificate && (
-                      <div className="flex items-center">
-                        <FileText className="w-4 h-4 mr-1" />
-                        <span className="text-blue-600 hover:text-blue-800 cursor-pointer">
-                          View Certificate
-                        </span>
+                    <p className="text-gray-600 mb-1">Relation: {request.relation_to_deceased}</p>
+                    <p className="text-sm text-gray-500 mb-2">Phone: {request.phone_number}</p>
+                    <p className="text-sm text-gray-500 mb-2">Email: {request.email}</p>
+                    <p className="text-sm text-gray-500">Submitted: {formatDate(request.created_at)}</p>
+                    {request.death_certificate_url && (
+                      <div className="mt-3">
+                        <a
+                          href={request.death_certificate_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1 text-primary-600 hover:text-primary-700"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span className="text-sm">View Death Certificate</span>
+                        </a>
                       </div>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">How Vault Access Works</h3>
-        <div className="space-y-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-primary-600">1</span>
-            </div>
-            <div className="ml-3">
-              <h4 className="text-sm font-medium text-gray-900">Nominee Submits Request</h4>
-              <p className="text-sm text-gray-500">
-                Nominee uploads death certificate and provides identification
-              </p>
-            </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="flex items-start">
-            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-primary-600">2</span>
-            </div>
-            <div className="ml-3">
-              <h4 className="text-sm font-medium text-gray-900">Document Verification</h4>
-              <p className="text-sm text-gray-500">
-                Admin reviews submitted documents for authenticity
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start">
-            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-primary-600">3</span>
-            </div>
-            <div className="ml-3">
-              <h4 className="text-sm font-medium text-gray-900">Vault Access Granted</h4>
-              <p className="text-sm text-gray-500">
-                Upon verification, nominee gains access to asset information
-              </p>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default Vault; 
+export default Vault;
