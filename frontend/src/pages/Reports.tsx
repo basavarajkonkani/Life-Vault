@@ -58,10 +58,6 @@ const Reports: React.FC = () => {
   const totalValue = assetAllocation.reduce((sum, asset) => sum + asset.amount, 0);
 
   // Add custom label renderer
-  const renderCustomLabel = (props: PieLabelRenderProps) => {
-    const { name, value } = props;
-    return `${name}: ${value}%`;
-  };
 
   return (
     <div className="space-y-6">
@@ -137,7 +133,7 @@ const Reports: React.FC = () => {
                   cy="50%"
                   outerRadius={100}
                   dataKey="value"
-                  label={renderCustomLabel}
+                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
                 >
                   {assetAllocation.map((entry: AssetAllocation, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
