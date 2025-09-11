@@ -1,6 +1,6 @@
-import { ReportHandler } from 'web-vitals';
+// ReportHandler type is not exported in web-vitals v5
 
-const reportWebVitals = (onPerfEntry?: ReportHandler) => {
+const reportWebVitals = (onPerfEntry?: (metric: any) => void) => {
   if (onPerfEntry && onPerfEntry instanceof Function) {
     import('web-vitals').then(({ onCLS, onFID, onFCP, onLCP, onTTFB }) => {
       onCLS(onPerfEntry);
