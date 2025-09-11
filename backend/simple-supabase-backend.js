@@ -10,9 +10,17 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3003'],
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3003",
+    "https://life-vault-frontend-y0a5.onrender.com",
+    "https://life-vault-frontend.onrender.com"
+  ],
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 200}));
 app.use(express.json());
 
 // Supabase client
