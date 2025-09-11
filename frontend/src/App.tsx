@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -7,31 +7,35 @@ import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import OwnerDashboard from './pages/OwnerDashboard';
-import NomineeDashboard from './pages/NomineeDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import Assets from './pages/Assets';
-import Nominees from './pages/Nominees';
-import Vault from './pages/Vault';
-import ClaimGuides from './pages/ClaimGuides';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import TradingAccounts from './pages/TradingAccounts';
 import './App.css';
+
+// Lazy load components for better performance
+const OwnerDashboard = React.lazy(() => import('./pages/OwnerDashboard'));
+const NomineeDashboard = React.lazy(() => import('./pages/NomineeDashboard'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const Assets = React.lazy(() => import('./pages/Assets'));
+const Nominees = React.lazy(() => import('./pages/Nominees'));
+const Vault = React.lazy(() => import('./pages/Vault'));
+const ClaimGuides = React.lazy(() => import('./pages/ClaimGuides'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const TradingAccounts = React.lazy(() => import('./pages/TradingAccounts'));
 
 // Create a client with optimized settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 10 * 60 * 1000, // 10 minutes - increased
       gcTime: 30 * 60 * 1000, // 30 minutes
-      retry: 2,
+      retry: 1, // Reduced retries
       refetchOnWindowFocus: false,
-      refetchOnMount: true,
+      refetchOnMount: false, // Don't refetch if data exists
       refetchOnReconnect: true,
+      networkMode: 'online', // Only fetch when online
     },
     mutations: {
       retry: 1,
+      networkMode: 'online',
     },
   },
 });
@@ -101,21 +105,23 @@ const AppContent: React.FC = () => {
   return (
     <Router>
       <Layout user={user} onLogout={handleLogout} navigationItems={navigationItems}>
-        <Routes>
-          <Route path="/" element={
-            user.role === 'owner' ? <OwnerDashboard /> :
-            user.role === 'nominee' ? <NomineeDashboard /> :
-            user.role === 'admin' || user.role === 'super-admin' ? <AdminDashboard /> :
-            <OwnerDashboard />
-          } />
-          <Route path="/assets" element={<Assets />} />
-          <Route path="/nominees" element={<Nominees />} />
-          <Route path="/vault" element={<Vault />} />
-          <Route path="/trading-accounts" element={<TradingAccounts />} />
-          <Route path="/claim-guides" element={<ClaimGuides />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <Suspense fallback={<LoadingSpinner size="lg" text="Loading page..." />}>
+          <Routes>
+            <Route path="/" element={
+              user.role === 'owner' ? <OwnerDashboard /> :
+              user.role === 'nominee' ? <NomineeDashboard /> :
+              user.role === 'admin' || user.role === 'super-admin' ? <AdminDashboard /> :
+              <OwnerDashboard />
+            } />
+            <Route path="/assets" element={<Assets />} />
+            <Route path="/nominees" element={<Nominees />} />
+            <Route path="/vault" element={<Vault />} />
+            <Route path="/trading-accounts" element={<TradingAccounts />} />
+            <Route path="/claim-guides" element={<ClaimGuides />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Suspense>
       </Layout>
     </Router>
   );

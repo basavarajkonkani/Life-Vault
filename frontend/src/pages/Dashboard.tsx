@@ -1,15 +1,65 @@
-import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import React, { Suspense, useState, useEffect } from 'react';
 import { Plus, Users, Lock, TrendingUp, Eye, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardStats } from '../hooks/queries/useDashboardStats';
 import DashboardSkeleton from '../components/skeletons/DashboardSkeleton';
 
-const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
+// Lazy load the heavy chart component
+const PieChart = React.lazy(() => 
+  import('recharts').then(module => ({
+    default: module.PieChart
+  }))
+);
 
-  // Use React Query for dashboard stats
+const Pie = React.lazy(() => 
+  import('recharts').then(module => ({
+    default: module.Pie
+  }))
+);
+
+const Cell = React.lazy(() => 
+  import('recharts').then(module => ({
+    default: module.Cell
+  }))
+);
+
+const ResponsiveContainer = React.lazy(() => 
+  import('recharts').then(module => ({
+    default: module.ResponsiveContainer
+  }))
+);
+
+const Legend = React.lazy(() => 
+  import('recharts').then(module => ({
+    default: module.Legend
+  }))
+);
+
+const Tooltip = React.lazy(() => 
+  import('recharts').then(module => ({
+    default: module.Tooltip
+  }))
+);
+
+const Dashboard: React.FC = () => {
+  const renderCustomLabel = (entry: any) => {
+    const { name, percent } = entry;
+    return `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`;
+  };
+  const navigate = useNavigate();
+  const [showChart, setShowChart] = useState(false);
+
+  // Use optimized React Query for dashboard stats
   const { stats, isLoading, isError, error, refetch, showDemoDataNotice } = useDashboardStats();
+
+  // Lazy load chart after initial render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowChart(true);
+    }, 100); // Small delay to prioritize initial content
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -106,7 +156,7 @@ const Dashboard: React.FC = () => {
               <Users className="w-6 h-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Nominees</p>
+              <p className="text-sm font-medium text-gray-600">Nominees</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalNominees}</p>
             </div>
           </div>
@@ -118,119 +168,84 @@ const Dashboard: React.FC = () => {
               <TrendingUp className="w-6 h-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Net Worth</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.netWorth)}</p>
+              <p className="text-sm font-medium text-gray-600">Trading Accounts</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalTradingAccounts}</p>
             </div>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Lock className="w-6 h-6 text-orange-600" />
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Lock className="w-6 h-6 text-yellow-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Vault Requests</p>
-              <p className="text-2xl font-bold text-gray-900">0</p>
+              <p className="text-sm font-medium text-gray-600">Net Worth</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.netWorth)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Asset Allocation Chart */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">Asset Allocation</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Asset Allocation Chart - Lazy Loaded */}
+      {showChart && stats.assetAllocation.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Asset Allocation</h3>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.assetAllocation}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {stats.assetAllocation.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            }>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.assetAllocation}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={renderCustomLabel}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {stats.assetAllocation.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </Suspense>
           </div>
+        </div>
+      )}
+
+      {/* Recent Activity */}
+      {stats.recentActivity.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
           <div className="space-y-4">
-            {stats.assetAllocation.map((item: any, index: number) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div 
-                    className="w-4 h-4 rounded-full mr-3" 
-                    style={{ backgroundColor: item.color }}
-                  ></div>
-                  <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(item.amount)}</p>
-                  <p className="text-xs text-gray-500">{item.value.toFixed(1)}%</p>
+            {stats.recentActivity.map((activity) => (
+              <div key={activity.id} className="flex items-center space-x-3">
+                <div className={`w-2 h-2 rounded-full ${
+                  activity.status === 'success' ? 'bg-green-500' :
+                  activity.status === 'warning' ? 'bg-yellow-500' :
+                  activity.status === 'error' ? 'bg-red-500' :
+                  'bg-blue-500'
+                }`} />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-900">{activity.description}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(activity.timestamp).toLocaleString()}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Building2 className="w-6 h-6 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Assets</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Manage your financial assets and investments.</p>
-          <button
-            onClick={() => navigate('/assets')}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            View Assets
-          </button>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center mb-4">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Nominees</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Manage your nominees and their allocation percentages.</p>
-          <button
-            onClick={() => navigate('/nominees')}
-            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            View Nominees
-          </button>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Lock className="w-6 h-6 text-purple-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Vault</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Submit and track vault requests.</p>
-          <button
-            onClick={() => navigate('/vault')}
-            className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            View Vault
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

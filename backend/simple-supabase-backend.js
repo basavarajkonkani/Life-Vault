@@ -950,3 +950,120 @@ app.listen(PORT, () => {
   console.log(`✅ Input validation enabled`);
   console.log(`🔄 Full CRUD operations available`);
 });
+
+// Optimized batched dashboard endpoint
+app.get('/api/dashboard/batch', authenticateDemoToken, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+    console.log('Fetching batched dashboard data for user:', userId);
+
+    // Execute all queries in parallel for maximum performance
+    const [
+      assetsResult,
+      nomineesResult,
+      tradingAccountsResult
+    ] = await Promise.allSettled([
+      supabase
+        .from('assets')
+        .select('id, category, current_value, status, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('nominees')
+        .select('id, name, relation, allocation_percentage, is_executor, is_backup')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('trading_accounts')
+        .select('id, broker_name, account_number, current_value, status, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+    ]);
+
+    // Extract data from results
+    const assets = assetsResult.status === 'fulfilled' ? assetsResult.value.data || [] : [];
+    const nominees = nomineesResult.status === 'fulfilled' ? nomineesResult.value.data || [] : [];
+    const tradingAccounts = tradingAccountsResult.status === 'fulfilled' ? tradingAccountsResult.value.data || [] : [];
+
+    // Calculate totals
+    const totalAssets = assets.length;
+    const totalNominees = nominees.length;
+    const totalTradingAccounts = tradingAccounts.length;
+    const totalValue = assets.reduce((sum, asset) => sum + parseFloat(asset.current_value || 0), 0);
+
+    // Prepare asset allocation data with colors
+    const colors = ['#1E3A8A', '#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE', '#EFF6FF', '#A78BFA'];
+    
+    const assetAllocation = [
+      ...assets.map((asset, index) => ({
+        name: asset.category,
+        value: parseFloat(asset.current_value || 0),
+        amount: parseFloat(asset.current_value || 0),
+        color: colors[index % colors.length]
+      })),
+      ...tradingAccounts.map((account, index) => ({
+        name: `Trading Account (${account.broker_name})`,
+        value: parseFloat(account.current_value || 0),
+        amount: parseFloat(account.current_value || 0),
+        color: colors[(assets.length + index) % colors.length]
+      }))
+    ];
+
+    // Prepare recent activity (simplified for performance)
+    const recentActivity = [
+      ...assets.slice(0, 3).map(asset => ({
+        id: `asset_${asset.id}`,
+        type: 'asset_added',
+        description: `Added ${asset.category} - ${asset.institution || 'Account'}`,
+        timestamp: new Date(asset.created_at),
+        status: 'success'
+      })),
+      ...nominees.slice(0, 2).map(nominee => ({
+        id: `nominee_${nominee.id}`,
+        type: 'nominee_updated',
+        description: `Updated ${nominee.name} (${nominee.relation})`,
+        timestamp: new Date(),
+        status: 'info'
+      }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
+
+    const response = {
+      totalAssets,
+      totalNominees,
+      totalTradingAccounts,
+      totalValue,
+      netWorth: totalValue,
+      assetAllocation,
+      recentActivity,
+      // Include raw data for other components
+      assets: assets.map(asset => ({
+        ...asset,
+        institution: asset.institution || 'N/A',
+        account_number: asset.account_number || 'N/A',
+        notes: asset.notes || '',
+        documents: asset.documents || []
+      })),
+      nominees: nominees.map(nominee => ({
+        ...nominee,
+        phone: nominee.phone || '',
+        email: nominee.email || '',
+        allocationPercentage: nominee.allocation_percentage,
+        isExecutor: nominee.is_executor,
+        isBackup: nominee.is_backup
+      })),
+      tradingAccounts: tradingAccounts.map(account => ({
+        ...account,
+        accountNumber: account.account_number,
+        currentValue: account.current_value,
+        brokerName: account.broker_name
+      }))
+    };
+
+    console.log('Batched dashboard data prepared successfully');
+    res.json(response);
+  } catch (error) {
+    console.error('Batched dashboard error:', error);
+    res.status(500).json({ error: 'Failed to get dashboard data' });
+  }
+});
+

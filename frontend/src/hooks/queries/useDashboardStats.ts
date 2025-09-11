@@ -12,6 +12,12 @@ interface DashboardStats {
   recentActivity: any[];
 }
 
+interface BatchedDashboardData extends DashboardStats {
+  assets: any[];
+  nominees: any[];
+  tradingAccounts: any[];
+}
+
 const demoStats: DashboardStats = {
   totalAssets: 6,
   totalNominees: 2,
@@ -34,7 +40,6 @@ const API_BASE_URL = 'http://localhost:3001/api';
 
 // Helper function to make authenticated API calls
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  // Use demo token for now
   const token = 'demo-token';
   
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -61,75 +66,66 @@ export const useDashboardStats = () => {
   // Get user ID with fallback
   const userId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
 
-  const { data: stats, isLoading, isError, error, refetch } = useQuery<DashboardStats, Error>({
-    queryKey: ['dashboardStats', userId],
+  const { data: batchedData, isLoading, isError, error, refetch } = useQuery<BatchedDashboardData, Error>({
+    queryKey: ['dashboardBatch', userId],
     queryFn: async () => {
       if (!userId) {
         console.warn('No user ID available, returning demo data');
-        return demoStats;
+        return {
+          ...demoStats,
+          assets: [],
+          nominees: [],
+          tradingAccounts: []
+        };
       }
 
       try {
-        console.log('Fetching dashboard stats for user ID:', userId);
+        console.log('Fetching batched dashboard data for user ID:', userId);
         
-        // Fetch stats from backend
-        const statsData = await apiCall('/dashboard/stats');
+        // Single API call to get all dashboard data
+        const response = await apiCall('/dashboard/batch');
         
-        // Fetch detailed data for asset allocation
-        const [assetsData, tradingAccountsData] = await Promise.allSettled([
-          apiCall('/dashboard/assets'),
-          apiCall('/dashboard/trading-accounts')
-        ]);
-
-        const assets = assetsData.status === 'fulfilled' ? assetsData.value || [] : [];
-        const tradingAccounts = tradingAccountsData.status === 'fulfilled' ? tradingAccountsData.value || [] : [];
-
-        const colors = ['#1E3A8A', '#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE', '#EFF6FF', '#A78BFA'];
-
-        const assetAllocation = [
-          ...assets.map((asset: any, index: number) => ({
-            name: asset.category,
-            value: parseFloat(asset.current_value || '0'),
-            amount: parseFloat(asset.current_value || '0'),
-            color: colors[index % colors.length]
-          })),
-          ...tradingAccounts.map((account: any, index: number) => ({
-            name: `Trading Account (${account.broker_name})`,
-            value: parseFloat(account.current_value || '0'),
-            amount: parseFloat(account.current_value || '0'),
-            color: colors[(assets.length + index) % colors.length]
-          }))
-        ];
-
-        const realStats = {
-          totalAssets: statsData.totalAssets || 0,
-          totalNominees: statsData.totalNominees || 0,
-          totalTradingAccounts: statsData.totalTradingAccounts || 0,
-          totalValue: statsData.totalValue || 0,
-          netWorth: statsData.totalValue || 0,
-          assetAllocation,
-          recentActivity: []
-        };
-
-        console.log('Dashboard stats calculated successfully:', realStats);
-        return realStats;
+        console.log('Batched dashboard data received successfully');
+        return response;
       } catch (err) {
-        console.error('Error fetching dashboard stats:', err);
-        return demoStats; // Fallback to demo data on error
+        console.error('Error fetching batched dashboard data:', err);
+        return {
+          ...demoStats,
+          assets: [],
+          nominees: [],
+          tradingAccounts: []
+        };
       }
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: 2,
+    staleTime: 10 * 60 * 1000, // 10 minutes - increased from 5
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    retry: 1, // Reduced retries for faster failure
+    refetchOnWindowFocus: false,
+    refetchOnMount: false, // Don't refetch if data exists
   });
 
+  // Extract stats from batched data
+  const stats: DashboardStats = batchedData ? {
+    totalAssets: batchedData.totalAssets,
+    totalNominees: batchedData.totalNominees,
+    totalTradingAccounts: batchedData.totalTradingAccounts,
+    totalValue: batchedData.totalValue,
+    netWorth: batchedData.netWorth,
+    assetAllocation: batchedData.assetAllocation,
+    recentActivity: batchedData.recentActivity
+  } : demoStats;
+
   return {
-    stats: stats || demoStats,
+    stats,
     isLoading,
     isError,
     error,
     refetch,
     showDemoDataNotice: isError || (stats === demoStats && !isLoading),
+    // Additional data for other components
+    assets: batchedData?.assets || [],
+    nominees: batchedData?.nominees || [],
+    tradingAccounts: batchedData?.tradingAccounts || [],
   };
 };
