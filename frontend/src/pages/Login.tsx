@@ -1,3 +1,4 @@
+// Force rebuild: 2025-09-12T10:13:04.882Z
 // Updated: 2025-09-12T10:09:00.190Z
 import React, { useState } from "react";
 import { Shield, Mail, Phone, Eye, EyeOff, Rocket } from "lucide-react";

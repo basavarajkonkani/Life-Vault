@@ -31,13 +31,16 @@
     "recharts": "^3.1.2",
     "tailwindcss": "^3.4.17",
     "typescript": "^4.9.5",
-    "yup": "^1.7.0"
+    "yup": "^1.7.0",
+    "serve": "^14.2.1"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "build:render": "npm run build && echo \"Build completed for Render\"",
+    "start:render": "serve -s build -l 3000"
   },
   "eslintConfig": {
     "extends": [
