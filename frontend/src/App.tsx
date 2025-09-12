@@ -1,6 +1,6 @@
 // Force rebuild: 2025-09-12T10:13:04.882Z
 // Updated: 2025-09-12T10:09:10.341Z
-import React, { Suspense, lazy, memo } from "react";
+import React, { Suspense, lazy, memo, useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotificationProvider } from "./contexts/NotificationContext";
@@ -141,7 +141,7 @@ const AppContent = memo(() => {
                 <Routes>
                   <Route path="/" element={<Navigate to="/login" replace />} />
                   <Route path="/login" element={<LoginPage />} />
-                  <Route path="/*" element={<MainApp />} />
+                  <Route path="/*" element={<AppWithFallback />} />
                 </Routes>
               </Router>
             </Suspense>
