@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session, AuthError } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session, AuthError } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
 interface UserProfile {
   id: string;
@@ -8,7 +8,7 @@ interface UserProfile {
   email: string;
   phone: string;
   address?: string;
-  role: "owner" | "nominee" | "admin";
+  role: 'owner' | 'nominee' | 'admin';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -26,7 +26,6 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: AuthError | null }>;
-  getUserId: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +33,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
@@ -49,42 +48,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Demo user profile for testing
-  const demoUserProfile: UserProfile = {
-    id: '550e8400-e29b-41d4-a716-446655440000',
-    name: 'Demo User',
-    email: 'demo@lifevault.com',
-    phone: '+91 9876543210',
-    address: '123 Demo Street, Demo City',
-    role: 'owner',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
+  // Fetch user profile from users table
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-  // Demo user for testing
-  const demoUser: User = {
-    id: '550e8400-e29b-41d4-a716-446655440000',
-    email: 'demo@lifevault.com',
-    phone: '+91 9876543210',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    aud: 'authenticated',
-    role: 'authenticated',
-    app_metadata: {},
-    user_metadata: {},
-    identities: [],
-    factors: []
-  };
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
 
-  // Demo session for testing
-  const demoSession: Session = {
-    access_token: 'demo-token',
-    refresh_token: 'demo-refresh-token',
-    expires_in: 3600,
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-    token_type: 'bearer',
-    user: demoUser
+      return data as UserProfile;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
   };
 
   // Initialize auth state
@@ -93,57 +75,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const initializeAuth = async () => {
       try {
-        // Check if user is already logged in (from localStorage or session)
-        const savedUser = localStorage.getItem('lifevault_user');
-        const savedSession = localStorage.getItem('lifevault_session');
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (savedUser && savedSession) {
-          // User is already logged in
-          if (mounted) {
-            setSession(JSON.parse(savedSession));
-            setUser(JSON.parse(savedUser));
-            setUserProfile(demoUserProfile);
-            setLoading(false);
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            const profile = await fetchUserProfile(session.user.id);
+            setUserProfile(profile);
           }
-        } else {
-          // No saved session, user needs to login
-          if (mounted) {
-            setUser(null);
-            setUserProfile(null);
-            setSession(null);
-            setLoading(false);
-          }
+          
+          setLoading(false);
         }
       } catch (error) {
-        console.error("Error initializing auth:", error);
+        console.error('Error initializing auth:', error);
         if (mounted) {
-          setUser(null);
-          setUserProfile(null);
-          setSession(null);
           setLoading(false);
         }
       }
     };
 
     initializeAuth();
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (mounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          const profile = await fetchUserProfile(session.user.id);
+          setUserProfile(profile);
+        } else {
+          setUserProfile(null);
+        }
+        
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      // For demo purposes, accept any email/password
-      if (email && password) {
-        setSession(demoSession);
-        setUser(demoUser);
-        setUserProfile(demoUserProfile);
-        
-        // Save to localStorage for persistence
-        localStorage.setItem('lifevault_user', JSON.stringify(demoUser));
-        localStorage.setItem('lifevault_session', JSON.stringify(demoSession));
-        
-        return { error: null };
-      } else {
-        return { error: { message: "Email and password are required" } as AuthError };
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
     } catch (error) {
       return { error: error as AuthError };
     }
@@ -151,15 +141,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
     try {
-      // For demo purposes, just sign in with demo user
-      setSession(demoSession);
-      setUser(demoUser);
-      setUserProfile(demoUserProfile);
-      
-      // Save to localStorage for persistence
-      localStorage.setItem('lifevault_user', JSON.stringify(demoUser));
-      localStorage.setItem('lifevault_session', JSON.stringify(demoSession));
-      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: userData.name,
+            phone: userData.phone,
+            address: userData.address,
+            role: userData.role || 'owner',
+          }
+        }
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      // Create user profile in users table
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            name: userData.name || '',
+            email: email,
+            phone: userData.phone || '',
+            address: userData.address || '',
+            role: userData.role || 'owner',
+            is_active: true,
+          });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+        }
+      }
+
       return { error: null };
     } catch (error) {
       return { error: error as AuthError };
@@ -168,8 +185,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signInWithOtp = async (phone: string) => {
     try {
-      // For demo purposes, just return success
-      return { error: null };
+      const { error } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          channel: 'sms'
+        }
+      });
+      return { error };
     } catch (error) {
       return { error: error as AuthError };
     }
@@ -177,20 +199,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const verifyOtp = async (phone: string, token: string) => {
     try {
-      // For demo purposes, accept any OTP
-      if (token) {
-        setSession(demoSession);
-        setUser(demoUser);
-        setUserProfile(demoUserProfile);
-        
-        // Save to localStorage for persistence
-        localStorage.setItem('lifevault_user', JSON.stringify(demoUser));
-        localStorage.setItem('lifevault_session', JSON.stringify(demoSession));
-        
-        return { error: null };
-      } else {
-        return { error: { message: "OTP is required" } as AuthError };
-      }
+      const { error } = await supabase.auth.verifyOtp({
+        phone,
+        token,
+        type: 'sms'
+      });
+      return { error };
     } catch (error) {
       return { error: error as AuthError };
     }
@@ -198,34 +212,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // Clear all state
+      await supabase.auth.signOut();
       setUser(null);
       setUserProfile(null);
       setSession(null);
-      
-      // Clear localStorage
-      localStorage.removeItem('lifevault_user');
-      localStorage.removeItem('lifevault_session');
-      
-      console.log("User signed out successfully");
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error('Error signing out:', error);
     }
   };
 
   const refreshSession = async () => {
     try {
-      // For demo purposes, just return the demo session
-      console.log("Session refreshed");
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('Error refreshing session:', error);
+      }
+      return data;
     } catch (error) {
-      console.error("Error refreshing session:", error);
+      console.error('Error refreshing session:', error);
     }
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     try {
       if (!user) {
-        return { error: { message: "No user logged in" } as AuthError };
+        return { error: { message: 'No user logged in' } as AuthError };
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', user.id);
+
+      if (error) {
+        return { error: { message: error.message } as AuthError };
       }
 
       // Update local state
@@ -237,10 +257,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       return { error: error as AuthError };
     }
-  };
-
-  const getUserId = () => {
-    return user?.id || null;
   };
 
   const value = {
@@ -255,7 +271,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut,
     refreshSession,
     updateProfile,
-    getUserId,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
