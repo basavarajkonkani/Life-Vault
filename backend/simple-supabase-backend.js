@@ -959,6 +959,144 @@ const initializeDemoData = async () => {
 
 
 
+
+// Test endpoint to manually create demo data
+app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => {
+  try {
+    const demoUserId = '550e8400-e29b-41d4-a716-446655440000';
+    
+    // Create demo user
+    const { error: userError } = await supabase.from('users').upsert({
+      id: demoUserId,
+      name: 'Demo User',
+      email: 'demo@lifevault.com',
+      phone: '+91 9876543210',
+      address: '123 Demo Street, Demo City',
+      role: 'owner',
+      is_active: true
+    });
+
+    if (userError) {
+      console.error('User creation error:', userError);
+    } else {
+      console.log('Demo user created/updated');
+    }
+
+    // Create demo assets
+    const demoAssets = [
+      {
+        user_id: demoUserId,
+        category: 'Bank',
+        institution: 'State Bank of India',
+        account_number: '****1234',
+        current_value: 500000,
+        status: 'Active',
+        notes: 'Primary savings account',
+        documents: []
+      },
+      {
+        user_id: demoUserId,
+        category: 'Mutual Fund',
+        institution: 'HDFC Mutual Fund',
+        account_number: 'MF001234',
+        current_value: 300000,
+        status: 'Active',
+        notes: 'Equity growth fund',
+        documents: []
+      },
+      {
+        user_id: demoUserId,
+        category: 'LIC Policy',
+        institution: 'Life Insurance Corporation',
+        account_number: 'LIC123456',
+        current_value: 200000,
+        status: 'Active',
+        notes: 'Term life insurance policy',
+        documents: []
+      },
+      {
+        user_id: demoUserId,
+        category: 'Fixed Deposit',
+        institution: 'ICICI Bank',
+        account_number: 'FD789012',
+        current_value: 150000,
+        status: 'Active',
+        notes: '5-year fixed deposit',
+        documents: []
+      }
+    ];
+
+    // Create demo nominees
+    const demoNominees = [
+      {
+        user_id: demoUserId,
+        name: 'Jane Doe',
+        relation: 'Spouse',
+        phone: '+91 9876543211',
+        email: 'jane@example.com',
+        allocation_percentage: 60,
+        is_executor: true,
+        is_backup: false
+      },
+      {
+        user_id: demoUserId,
+        name: 'John Jr',
+        relation: 'Child',
+        phone: '+91 9876543212',
+        email: 'john@example.com',
+        allocation_percentage: 40,
+        is_executor: false,
+        is_backup: false
+      }
+    ];
+
+    // Create demo trading accounts
+    const demoTradingAccounts = [
+      {
+        user_id: demoUserId,
+        platform: 'Zerodha',
+        account_number: 'ZR123456',
+        current_value: 250000,
+        status: 'Active',
+        notes: 'Primary trading account'
+      },
+      {
+        user_id: demoUserId,
+        platform: 'Upstox',
+        account_number: 'UP789012',
+        current_value: 100000,
+        status: 'Active',
+        notes: 'Secondary trading account'
+      }
+    ];
+
+    // Clear existing data first
+    await supabase.from('assets').delete().eq('user_id', demoUserId);
+    await supabase.from('nominees').delete().eq('user_id', demoUserId);
+    await supabase.from('trading_accounts').delete().eq('user_id', demoUserId);
+
+    // Insert demo data
+    const { error: assetsError } = await supabase.from('assets').insert(demoAssets);
+    const { error: nomineesError } = await supabase.from('nominees').insert(demoNominees);
+    const { error: tradingError } = await supabase.from('trading_accounts').insert(demoTradingAccounts);
+
+    if (assetsError) console.error('Assets error:', assetsError);
+    if (nomineesError) console.error('Nominees error:', nomineesError);
+    if (tradingError) console.error('Trading accounts error:', tradingError);
+
+    res.json({ 
+      success: true, 
+      message: 'Demo data created successfully',
+      assets: demoAssets.length,
+      nominees: demoNominees.length,
+      tradingAccounts: demoTradingAccounts.length
+    });
+  } catch (error) {
+    console.error('Demo data creation error:', error);
+    res.status(500).json({ error: 'Failed to create demo data' });
+  }
+});
+
 // Start server
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
