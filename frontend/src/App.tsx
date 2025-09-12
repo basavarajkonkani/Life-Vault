@@ -1,3 +1,4 @@
+// Updated: 2025-09-12T10:05:35.295Z
 import React, { Suspense, lazy, memo } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -49,33 +50,26 @@ const getNavigationItems = (userRole: string) => {
     { path: "/trading-accounts", label: "Trading Accounts", icon: "Building2" },
   ];
 
-  const roleSpecificItems = {
-    owner: [
+  if (userRole === "admin") {
+    return [
       ...baseItems,
-      { path: "/claim-guides", label: "Claim Guides", icon: "BookOpen" },
-      { path: "/reports", label: "Reports", icon: "TrendingUp" },
+      { path: "/reports", label: "Reports", icon: "BarChart3" },
       { path: "/settings", label: "Settings", icon: "Settings" },
-    ],
-    nominee: [
-      { path: "/", label: "Dashboard", icon: "Home" },
-      { path: "/vault", label: "Vault", icon: "Lock" },
-      { path: "/claim-guides", label: "Claim Guides", icon: "BookOpen" },
-    ],
-    admin: [
-      ...baseItems,
-      { path: "/reports", label: "Reports", icon: "TrendingUp" },
-      { path: "/settings", label: "Settings", icon: "Settings" },
-    ],
-  };
+    ];
+  }
 
-  return roleSpecificItems[userRole as keyof typeof roleSpecificItems] || baseItems;
+  return [
+    ...baseItems,
+    { path: "/reports", label: "Reports", icon: "BarChart3" },
+    { path: "/settings", label: "Settings", icon: "Settings" },
+  ];
 };
 
 // Login page component that redirects if already authenticated
 const LoginPage = memo(() => {
   const { user, userProfile, loading } = useAuth();
 
-  // Show loading while checking authentication
+  // Show loading spinner while checking authentication
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -119,12 +113,17 @@ const AuthenticatedApp = memo(() => {
 
   return (
     <ResponsiveLayout user={userProfile} onLogout={signOut} navigationItems={navigationItems}>
-                                                                      <Routes>
-                  <Route path="/" element={<Navigate to="/login" replace />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/*" element={<MainApp />} />
-                  <Route path="*" element={<Navigate to="/login" replace />} />
-                </Routes>
+      <Routes>
+        <Route path="/" element={<OwnerDashboard />} />
+        <Route path="/assets" element={<Assets />} />
+        <Route path="/nominees" element={<Nominees />} />
+        <Route path="/vault" element={<Vault />} />
+        <Route path="/trading-accounts" element={<TradingAccounts />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/claim-guides" element={<ClaimGuides />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </ResponsiveLayout>
   );
 });
@@ -139,6 +138,7 @@ const AppContent = memo(() => {
             <Suspense fallback={<LoadingSpinner />}>
               <Router>
                 <Routes>
+                  <Route path="/" element={<Navigate to="/login" replace />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/*" element={<MainApp />} />
                 </Routes>
