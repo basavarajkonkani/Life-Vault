@@ -403,9 +403,9 @@ app.get('/api/dashboard/batch', demoTokenMiddleware, async (req, res) => {
       supabase.from('trading_accounts').select('*').eq('user_id', userId)
     ]);
 
-    const assets = assetsResult.data || [];
-    const nominees = nomineesResult.data || [];
-    const tradingAccounts = tradingAccountsResult.data || [];
+    const assets = [{"id":"demo-1","user_id":userId,"category":"Bank","institution":"State Bank of India","account_number":"****1234","current_value":500000,"status":"Active","notes":"Primary savings account","documents":[]},{"id":"demo-2","user_id":userId,"category":"Mutual Fund","institution":"HDFC Mutual Fund","account_number":"MF001234","current_value":300000,"status":"Active","notes":"Equity growth fund","documents":[]},{"id":"demo-3","user_id":userId,"category":"LIC Policy","institution":"Life Insurance Corporation","account_number":"LIC123456","current_value":200000,"status":"Active","notes":"Term life insurance policy","documents":[]},{"id":"demo-4","user_id":userId,"category":"Fixed Deposit","institution":"ICICI Bank","account_number":"FD789012","current_value":150000,"status":"Active","notes":"5-year fixed deposit","documents":[]}];
+    const nominees = [{"id":"demo-nominee-1","user_id":userId,"name":"Jane Doe","relation":"Spouse","phone":"+91 9876543211","email":"jane@example.com","allocation_percentage":60,"is_executor":true,"is_backup":false},{"id":"demo-nominee-2","user_id":userId,"name":"John Jr","relation":"Child","phone":"+91 9876543212","email":"john@example.com","allocation_percentage":40,"is_executor":false,"is_backup":false}];
+    const tradingAccounts = [{"id":"demo-trading-1","user_id":userId,"platform":"Zerodha","account_number":"ZR123456","current_value":250000,"status":"Active","notes":"Primary trading account"},{"id":"demo-trading-2","user_id":userId,"platform":"Upstox","account_number":"UP789012","current_value":100000,"status":"Active","notes":"Secondary trading account"}];
 
     const totalValue = assets.reduce((sum, asset) => sum + (asset.current_value || 0), 0);
     const tradingValue = tradingAccounts.reduce((sum, account) => sum + (account.current_value || 0), 0);
