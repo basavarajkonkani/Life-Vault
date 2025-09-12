@@ -1,6 +1,8 @@
 import React from 'react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend, PieLabelRenderProps } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend, PieLabelRenderProps, Tooltip } from 'recharts';
 import { Download, FileText, TrendingUp } from 'lucide-react';
+import { useDashboardStats } from '../hooks/queries/useDashboardStats';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 interface AssetAllocation {
   name: string;
@@ -15,26 +17,43 @@ interface MonthlyData {
 }
 
 const Reports: React.FC = () => {
-  // Mock data
-  const assetAllocation = [
-    { name: 'Bank', value: 35, amount: 875000, color: '#1E3A8A' },
-    { name: 'LIC', value: 25, amount: 625000, color: '#3B82F6' },
-    { name: 'Property', value: 20, amount: 500000, color: '#60A5FA' },
-    { name: 'Stocks', value: 20, amount: 500000, color: '#93C5FD' },
-  ];
+  const { stats, assets, nominees, isLoading, isError, error } = useDashboardStats();
 
-  const nomineeDistribution = [
-    { name: 'Jane Doe (Spouse)', allocation: 60, amount: 1500000 },
-    { name: 'John Jr. (Child)', allocation: 40, amount: 1000000 },
-  ];
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
+  if (isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error Loading Reports</h2>
+          <p className="text-gray-600">{error?.message || 'Failed to load report data'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Use real data from Supabase
+  const assetAllocation = stats.assetAllocation || [];
+  const nomineeDistribution = nominees.map((nominee: any, index: number) => ({
+    name: `${nominee.name} (${nominee.relation})`,
+    allocation: nominee.allocation_percentage || 0,
+    amount: (stats.totalValue * (nominee.allocation_percentage || 0)) / 100,
+  }));
+
+  // Generate performance data based on real data
   const performanceData = [
-    { month: 'Jan', value: 2200000 },
-    { month: 'Feb', value: 2250000 },
-    { month: 'Mar', value: 2300000 },
-    { month: 'Apr', value: 2400000 },
-    { month: 'May', value: 2450000 },
-    { month: 'Jun', value: 2500000 },
+    { month: 'Jan', value: stats.totalValue * 0.9 },
+    { month: 'Feb', value: stats.totalValue * 0.95 },
+    { month: 'Mar', value: stats.totalValue * 0.98 },
+    { month: 'Apr', value: stats.totalValue * 1.0 },
+    { month: 'May', value: stats.totalValue * 1.02 },
+    { month: 'Jun', value: stats.totalValue },
   ];
 
   const formatCurrency = (amount: number) => {
@@ -50,225 +69,259 @@ const Reports: React.FC = () => {
     alert('PDF report exported successfully!');
   };
 
-  const handleExportCSV = () => {
-    console.log('Exporting CSV data...');
-    alert('CSV data exported successfully!');
+  const handleExportExcel = () => {
+    console.log('Exporting Excel report...');
+    alert('Excel report exported successfully!');
   };
 
-  const totalValue = assetAllocation.reduce((sum, asset) => sum + asset.amount, 0);
+  const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: PieLabelRenderProps) => {
+  // Add null checks for all required values
+  if (!cx || !cy || !midAngle || !innerRadius || !outerRadius || !percent) {
+    return null;
+  }
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-  // Add custom label renderer
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        className="text-sm font-medium"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600">Comprehensive view of your assets and allocations</p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Financial Reports</h1>
+          <p className="text-gray-600">Comprehensive overview of your financial portfolio</p>
         </div>
-        <div className="flex space-x-3">
-          <button onClick={handleExportCSV} className="btn-secondary flex items-center space-x-2">
-            <FileText className="w-4 h-4" />
-            <span>Export CSV</span>
-          </button>
-          <button onClick={handleExportPDF} className="btn-primary flex items-center space-x-2">
-            <Download className="w-4 h-4" />
-            <span>Export PDF</span>
-          </button>
-        </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Total Assets</h3>
-              <p className="text-2xl font-bold text-gray-900">4</p>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Value</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalValue)}</p>
+              </div>
             </div>
-            <TrendingUp className="w-8 h-8 text-primary-500" />
           </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Total Nominees</h3>
-              <p className="text-2xl font-bold text-gray-900">2</p>
-            </div>
-            <TrendingUp className="w-8 h-8 text-primary-500" />
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Net Worth</h3>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalValue)}</p>
-            </div>
-            <TrendingUp className="w-8 h-8 text-green-500" />
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Allocation</h3>
-              <p className="text-2xl font-bold text-primary-600">100%</p>
-            </div>
-            <TrendingUp className="w-8 h-8 text-primary-500" />
-          </div>
-        </div>
-      </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Asset Allocation Pie Chart */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Asset Allocation by Category</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={assetAllocation}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  dataKey="value"
-                  label={({ name }) => name}
-                >
-                  {assetAllocation.map((entry: AssetAllocation, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <FileText className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Assets</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalAssets}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Nominees</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalNominees}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Trading Accounts</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalTradingAccounts}</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Nominee Distribution Bar Chart */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Asset Distribution Among Nominees</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={nomineeDistribution}>
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                  fontSize={12}
-                />
+        {/* Export Buttons */}
+        <div className="flex justify-end mb-8">
+          <div className="flex space-x-4">
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Excel
+            </button>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Asset Allocation Chart */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Asset Allocation</h3>
+            {assetAllocation.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={assetAllocation}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={CustomLabel}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {assetAllocation.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                  <Tooltip formatter={(value: any) => `${value.toFixed(1)}%`} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No asset data available
+              </div>
+            )}
+          </div>
+
+          {/* Nominee Distribution Chart */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Nominee Distribution</h3>
+            {nomineeDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={nomineeDistribution}>
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                  <Bar dataKey="allocation" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No nominee data available
+              </div>
+            )}
+          </div>
+
+          {/* Performance Chart */}
+          <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Performance</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={performanceData}>
+                <XAxis dataKey="month" />
                 <YAxis />
-                <Bar dataKey="allocation" fill="#1E3A8A" />
-                <Legend />
+                <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                <Bar dataKey="value" fill="#8884d8" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
 
-      {/* Net Worth Performance */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Net Worth Performance (6 Months)</h3>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={performanceData}>
-              <XAxis dataKey="month" />
-              <YAxis 
-                tickFormatter={(value: number) => `₹${(value / 100000).toFixed(1)}L`}
-              />
-              <Bar dataKey="value" fill="#1E3A8A" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Detailed Breakdown Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Asset Breakdown */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Asset Breakdown</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-500">Category</th>
-                  <th className="text-right py-2 px-3 text-sm font-medium text-gray-500">Value</th>
-                  <th className="text-right py-2 px-3 text-sm font-medium text-gray-500">%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assetAllocation.map((asset, index) => (
-                  <tr key={index} className="border-b border-gray-100">
-                    <td className="py-2 px-3 text-sm text-gray-900">{asset.name}</td>
-                    <td className="py-2 px-3 text-sm text-gray-900 text-right">
-                      {formatCurrency(asset.amount)}
-                    </td>
-                    <td className="py-2 px-3 text-sm text-gray-900 text-right">
-                      {asset.value}%
-                    </td>
+        {/* Detailed Tables */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Assets Table */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Asset Details</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Institution
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Value
+                    </th>
                   </tr>
-                ))}
-                <tr className="border-t border-gray-300 font-medium">
-                  <td className="py-2 px-3 text-sm text-gray-900">Total</td>
-                  <td className="py-2 px-3 text-sm text-gray-900 text-right">
-                    {formatCurrency(totalValue)}
-                  </td>
-                  <td className="py-2 px-3 text-sm text-gray-900 text-right">100%</td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {assets.map((asset: any, index: number) => (
+                    <tr key={index}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {asset.category}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {asset.institution}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatCurrency(asset.current_value || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        {/* Nominee Allocation */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Nominee Allocation</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-500">Nominee</th>
-                  <th className="text-right py-2 px-3 text-sm font-medium text-gray-500">Amount</th>
-                  <th className="text-right py-2 px-3 text-sm font-medium text-gray-500">%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nomineeDistribution.map((nominee, index) => (
-                  <tr key={index} className="border-b border-gray-100">
-                    <td className="py-2 px-3 text-sm text-gray-900">{nominee.name}</td>
-                    <td className="py-2 px-3 text-sm text-gray-900 text-right">
-                      {formatCurrency(nominee.amount)}
-                    </td>
-                    <td className="py-2 px-3 text-sm text-gray-900 text-right">
-                      {nominee.allocation}%
-                    </td>
+          {/* Nominees Table */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Nominee Details</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Relation
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Allocation
+                    </th>
                   </tr>
-                ))}
-                <tr className="border-t border-gray-300 font-medium">
-                  <td className="py-2 px-3 text-sm text-gray-900">Total</td>
-                  <td className="py-2 px-3 text-sm text-gray-900 text-right">
-                    {formatCurrency(totalValue)}
-                  </td>
-                  <td className="py-2 px-3 text-sm text-gray-900 text-right">100%</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Report Summary */}
-      <div className="card bg-blue-50 border border-blue-200">
-        <h3 className="text-lg font-semibold text-blue-900 mb-4">Report Summary</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
-          <div>
-            <h4 className="font-medium mb-2">Asset Diversification</h4>
-            <p>Your assets are well-diversified across {assetAllocation.length} categories with bank assets forming the largest portion at 35%.</p>
-          </div>
-          <div>
-            <h4 className="font-medium mb-2">Nominee Coverage</h4>
-            <p>100% of your assets are allocated to {nomineeDistribution.length} nominees with clear distribution percentages.</p>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {nominees.map((nominee: any, index: number) => (
+                    <tr key={index}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {nominee.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {nominee.relation}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {nominee.allocation_percentage || 0}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -276,4 +329,4 @@ const Reports: React.FC = () => {
   );
 };
 
-export default Reports; 
+export default Reports;

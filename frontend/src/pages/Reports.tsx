@@ -75,21 +75,25 @@ const Reports: React.FC = () => {
   };
 
   const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: PieLabelRenderProps) => {
+  // Add null checks for all required values
+  if (!cx || !cy || !midAngle || !innerRadius || !outerRadius || !percent) {
+    return null;
+  }
     const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const radius = Number(innerRadius) + (Number(outerRadius) - Number(innerRadius)) * 0.5;
+    const x = Number(cx) + radius * Math.cos(-Number(midAngle) * RADIAN);
+    const y = Number(cy) + radius * Math.sin(-Number(midAngle) * RADIAN);
 
     return (
       <text 
         x={x} 
         y={y} 
         fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
+        textAnchor={x > Number(cx) ? 'start' : 'end'} 
         dominantBaseline="central"
         className="text-sm font-medium"
       >
-        {`${(percent * 100).toFixed(0)}%`}
+        {`${(Number(percent) * 100).toFixed(0)}%`}
       </text>
     );
   };
