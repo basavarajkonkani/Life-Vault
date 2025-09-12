@@ -819,8 +819,137 @@ app.delete('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
   }
 });
 
+
+// Initialize demo data
+const initializeDemoData = async () => {
+  try {
+    const demoUserId = '550e8400-e29b-41d4-a716-446655440000';
+    
+    // Check if demo data already exists
+    const { data: existingAssets } = await supabase
+      .from('assets')
+      .select('id')
+      .eq('user_id', demoUserId)
+      .limit(1);
+
+    if (existingAssets && existingAssets.length > 0) {
+      console.log('Demo data already exists, skipping initialization');
+      return;
+    }
+
+    // Create demo assets
+    const demoAssets = [
+      {
+        user_id: demoUserId,
+        category: 'Bank',
+        institution: 'State Bank of India',
+        account_number: '****1234',
+        current_value: 500000,
+        status: 'Active',
+        notes: 'Primary savings account',
+        documents: []
+      },
+      {
+        user_id: demoUserId,
+        category: 'Mutual Fund',
+        institution: 'HDFC Mutual Fund',
+        account_number: 'MF001234',
+        current_value: 300000,
+        status: 'Active',
+        notes: 'Equity growth fund',
+        documents: []
+      },
+      {
+        user_id: demoUserId,
+        category: 'LIC Policy',
+        institution: 'Life Insurance Corporation',
+        account_number: 'LIC123456',
+        current_value: 200000,
+        status: 'Active',
+        notes: 'Term life insurance policy',
+        documents: []
+      },
+      {
+        user_id: demoUserId,
+        category: 'Fixed Deposit',
+        institution: 'ICICI Bank',
+        account_number: 'FD789012',
+        current_value: 150000,
+        status: 'Active',
+        notes: '5-year fixed deposit',
+        documents: []
+      }
+    ];
+
+    // Create demo nominees
+    const demoNominees = [
+      {
+        user_id: demoUserId,
+        name: 'Jane Doe',
+        relation: 'Spouse',
+        phone: '+91 9876543211',
+        email: 'jane@example.com',
+        allocation_percentage: 60,
+        is_executor: true,
+        is_backup: false
+      },
+      {
+        user_id: demoUserId,
+        name: 'John Jr',
+        relation: 'Child',
+        phone: '+91 9876543212',
+        email: 'john@example.com',
+        allocation_percentage: 40,
+        is_executor: false,
+        is_backup: false
+      }
+    ];
+
+    // Create demo trading accounts
+    const demoTradingAccounts = [
+      {
+        user_id: demoUserId,
+        platform: 'Zerodha',
+        account_number: 'ZR123456',
+        current_value: 250000,
+        status: 'Active',
+        notes: 'Primary trading account'
+      },
+      {
+        user_id: demoUserId,
+        platform: 'Upstox',
+        account_number: 'UP789012',
+        current_value: 100000,
+        status: 'Active',
+        notes: 'Secondary trading account'
+      }
+    ];
+
+    // Insert demo data
+    await supabase.from('assets').insert(demoAssets);
+    await supabase.from('nominees').insert(demoNominees);
+    await supabase.from('trading_accounts').insert(demoTradingAccounts);
+
+    console.log('✅ Demo data initialized successfully');
+  } catch (error) {
+    console.error('❌ Demo data initialization error:', error);
+  }
+};
+
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`CORS enabled for origins: ${JSON.stringify([
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3003",
+    "https://life-vault-frontend-y0a5.onrender.com",
+    "https://life-vault-frontend.onrender.com"
+  ])}`);
+  
+  // Initialize demo data
+  await initializeDemoData();
+});
   console.log(`Server running on port ${PORT}`);
   console.log(`CORS enabled for origins: ${JSON.stringify([
     "http://localhost:3000",
