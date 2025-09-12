@@ -1,13 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUserIdSync, ensureDemoUser } from '../../lib/supabase';
-import { useAuth } from '../useAuth';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../useAuth";
+import { tradingAccountsAPI } from "../../services/api";
 
 interface TradingAccount {
   id: string;
-  broker_name: string;
-  client_id: string;
-  demat_number: string;
-  nominee_id: string | null;
+  platform: string;
+  account_number: string;
   current_value: number;
   status: string;
   notes: string;
@@ -16,47 +14,16 @@ interface TradingAccount {
 }
 
 interface TradingAccountInput {
-  brokerName: string;
-  clientId: string;
-  dematNumber: string;
-  nomineeId?: string | null;
+  platform: string;
+  accountNumber: string;
   currentValue: number;
   status: string;
   notes: string;
 }
 
-// Backend API base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-// Helper function to make authenticated API calls
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  // Use demo token for now
-  const token = 'demo-token';
-  
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
-};
-
 export const useTradingAccounts = () => {
   const queryClient = useQueryClient();
-  const { getUserId } = useAuth();
-  
-  // Get user ID with fallback
-  const userId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
+  const { user, userProfile } = useAuth();
 
   // Fetch trading accounts
   const {
@@ -66,17 +33,16 @@ export const useTradingAccounts = () => {
     error,
     refetch
   } = useQuery<TradingAccount[]>({
-    queryKey: ['tradingAccounts', userId],
+    queryKey: ["tradingAccounts", user?.id],
     queryFn: async () => {
-      if (!userId) {
-        console.error('No user ID available for trading accounts query');
-        throw new Error('User not authenticated');
+      if (!user || !userProfile) {
+        throw new Error("User not authenticated");
       }
 
-      console.log('Fetching trading accounts for user ID:', userId);
-      return await apiCall('/dashboard/trading-accounts');
+      console.log("Fetching trading accounts for user ID:", user.id);
+      return await tradingAccountsAPI.getAll();
     },
-    enabled: !!userId,
+    enabled: !!user && !!userProfile,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 2,
@@ -85,111 +51,97 @@ export const useTradingAccounts = () => {
 
   // Create trading account mutation
   const createTradingAccount = useMutation({
-    mutationFn: async (accountData: TradingAccountInput) => {
-      const currentUserId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
-      if (!currentUserId) {
-        console.error('No user ID available for create trading account');
-        throw new Error('User not authenticated');
+    mutationFn: async (tradingAccountData: TradingAccountInput) => {
+      if (!user || !userProfile) {
+        throw new Error("User not authenticated");
       }
 
-      console.log('Creating trading account for user ID:', currentUserId, 'with data:', accountData);
+      console.log("Creating trading account for user ID:", user.id, "with data:", tradingAccountData);
 
       // Validate required fields
-      if (!accountData.brokerName || !accountData.clientId || !accountData.dematNumber) {
-        throw new Error('All required fields must be filled');
+      if (!tradingAccountData.platform || !tradingAccountData.accountNumber) {
+        throw new Error("All required fields must be filled");
       }
 
-      if (accountData.currentValue < 0) {
-        throw new Error('Current value must be a positive number');
+      if (tradingAccountData.currentValue < 0) {
+        throw new Error("Current value must be a positive number");
       }
 
-      const response = await apiCall('/trading-accounts', {
-        method: 'POST',
-        body: JSON.stringify({
-          brokerName: accountData.brokerName,
-          clientId: accountData.clientId,
-          dematNumber: accountData.dematNumber,
-          nomineeId: accountData.nomineeId,
-          currentValue: accountData.currentValue,
-          status: accountData.status || 'Active',
-          notes: accountData.notes || '',
-        }),
+      const response = await tradingAccountsAPI.create({
+        platform: tradingAccountData.platform,
+        accountNumber: tradingAccountData.accountNumber,
+        currentValue: tradingAccountData.currentValue,
+        status: tradingAccountData.status || "Active",
+        notes: tradingAccountData.notes || "",
       });
 
-      console.log('Trading account created successfully:', response);
+      console.log("Trading account created successfully:", response);
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tradingAccounts', userId] });
+      queryClient.invalidateQueries({ queryKey: ["tradingAccounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardBatch", user?.id] });
     },
     onError: (error) => {
-      console.error('Create trading account mutation error:', error);
+      console.error("Create trading account mutation error:", error);
     },
   });
 
   // Update trading account mutation
   const updateTradingAccount = useMutation({
-    mutationFn: async ({ id, ...accountData }: { id: string } & Partial<TradingAccountInput>) => {
-      console.log('Updating trading account with ID:', id, 'with data:', accountData);
+    mutationFn: async ({ id, ...tradingAccountData }: { id: string } & Partial<TradingAccountInput>) => {
+      console.log("Updating trading account with ID:", id, "with data:", tradingAccountData);
       
       // Validate required fields
-      if (accountData.brokerName && !accountData.brokerName.trim()) {
-        throw new Error('Broker name is required');
+      if (tradingAccountData.platform && !tradingAccountData.platform.trim()) {
+        throw new Error("Platform is required");
       }
-      if (accountData.clientId && !accountData.clientId.trim()) {
-        throw new Error('Client ID is required');
+      if (tradingAccountData.accountNumber && !tradingAccountData.accountNumber.trim()) {
+        throw new Error("Account number is required");
       }
-      if (accountData.dematNumber && !accountData.dematNumber.trim()) {
-        throw new Error('Demat number is required');
-      }
-      if (accountData.currentValue !== undefined && accountData.currentValue < 0) {
-        throw new Error('Current value must be a positive number');
+      if (tradingAccountData.currentValue !== undefined && tradingAccountData.currentValue < 0) {
+        throw new Error("Current value must be a positive number");
       }
 
-      const response = await apiCall(`/trading-accounts/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          brokerName: accountData.brokerName,
-          clientId: accountData.clientId,
-          dematNumber: accountData.dematNumber,
-          nomineeId: accountData.nomineeId,
-          currentValue: accountData.currentValue,
-          status: accountData.status,
-          notes: accountData.notes,
-        }),
+      const response = await tradingAccountsAPI.update(id, {
+        platform: tradingAccountData.platform,
+        accountNumber: tradingAccountData.accountNumber,
+        currentValue: tradingAccountData.currentValue,
+        status: tradingAccountData.status,
+        notes: tradingAccountData.notes,
       });
 
-      console.log('Trading account updated successfully:', response);
+      console.log("Trading account updated successfully:", response);
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tradingAccounts', userId] });
+      queryClient.invalidateQueries({ queryKey: ["tradingAccounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardBatch", user?.id] });
     },
     onError: (error) => {
-      console.error('Update trading account mutation error:', error);
+      console.error("Update trading account mutation error:", error);
     },
   });
 
   // Delete trading account mutation
   const deleteTradingAccount = useMutation({
     mutationFn: async (id: string) => {
-      console.log('Deleting trading account with ID:', id);
+      console.log("Deleting trading account with ID:", id);
       
       if (!id) {
-        throw new Error('Trading account ID is required for deletion');
+        throw new Error("Trading account ID is required for deletion");
       }
       
-      await apiCall(`/trading-accounts/${id}`, {
-        method: 'DELETE',
-      });
+      await tradingAccountsAPI.delete(id);
 
-      console.log('Trading account deleted successfully');
+      console.log("Trading account deleted successfully");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tradingAccounts', userId] });
+      queryClient.invalidateQueries({ queryKey: ["tradingAccounts", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardBatch", user?.id] });
     },
     onError: (error) => {
-      console.error('Delete trading account mutation error:', error);
+      console.error("Delete trading account mutation error:", error);
     },
   });
 

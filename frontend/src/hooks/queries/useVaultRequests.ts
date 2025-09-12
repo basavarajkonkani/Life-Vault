@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUserIdSync, ensureDemoUser } from '../../lib/supabase';
 import { useAuth } from '../useAuth';
+import { vaultAPI } from '../../services/api';
 
 interface VaultRequest {
   id: string;
@@ -25,38 +25,9 @@ interface VaultRequestInput {
   notes?: string | null;
 }
 
-// Backend API base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-// Helper function to make authenticated API calls
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  // Use demo token for now
-  const token = 'demo-token';
-  
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
-};
-
 export const useVaultRequests = () => {
   const queryClient = useQueryClient();
-  const { getUserId } = useAuth();
-  
-  // Get user ID with fallback
-  const userId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
+  const { user, userProfile } = useAuth();
 
   // Fetch vault requests
   const {
@@ -66,17 +37,16 @@ export const useVaultRequests = () => {
     error,
     refetch
   } = useQuery<VaultRequest[]>({
-    queryKey: ['vaultRequests', userId],
+    queryKey: ['vaultRequests', user?.id],
     queryFn: async () => {
-      if (!userId) {
-        console.error('No user ID available for vault requests query');
+      if (!user || !userProfile) {
         throw new Error('User not authenticated');
       }
 
-      console.log('Fetching vault requests for user ID:', userId);
-      return await apiCall('/vault-requests');
+      console.log('Fetching vault requests for user ID:', user.id);
+      return await vaultAPI.getRequests();
     },
-    enabled: !!userId,
+    enabled: !!user && !!userProfile,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 2,
@@ -86,13 +56,11 @@ export const useVaultRequests = () => {
   // Create vault request mutation
   const createVaultRequest = useMutation({
     mutationFn: async (requestData: VaultRequestInput) => {
-      const currentUserId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
-      if (!currentUserId) {
-        console.error("No user ID available for create vault request");
-        throw new Error("User not authenticated");
+      if (!user || !userProfile) {
+        throw new Error('User not authenticated');
       }
 
-      console.log('Creating vault request for user ID:', currentUserId, 'with data:', requestData);
+      console.log('Creating vault request for user ID:', user.id, 'with data:', requestData);
 
       // Validate required fields
       if (!requestData.nomineeName || !requestData.relationToDeceased || !requestData.phoneNumber || !requestData.email) {
@@ -111,23 +79,20 @@ export const useVaultRequests = () => {
         throw new Error('Please enter a valid phone number');
       }
 
-      const response = await apiCall('/vault-requests', {
-        method: 'POST',
-        body: JSON.stringify({
-          nomineeId: null,
-          nomineeName: requestData.nomineeName,
-          relationToDeceased: requestData.relationToDeceased,
-          phoneNumber: requestData.phoneNumber,
-          email: requestData.email,
-          deathCertificateUrl: requestData.deathCertificateUrl,
-        }),
+      const response = await vaultAPI.createRequest({
+        nomineeId: null,
+        nomineeName: requestData.nomineeName,
+        relationToDeceased: requestData.relationToDeceased,
+        phoneNumber: requestData.phoneNumber,
+        email: requestData.email,
+        deathCertificateUrl: requestData.deathCertificateUrl,
       });
 
       console.log('Vault request created successfully:', response);
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaultRequests', userId] });
+      queryClient.invalidateQueries({ queryKey: ['vaultRequests', user?.id] });
     },
     onError: (error) => {
       console.error('Create vault request mutation error:', error);
@@ -169,24 +134,21 @@ export const useVaultRequests = () => {
         }
       }
 
-      const response = await apiCall(`/vault-requests/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          nomineeId: null,
-          nomineeName: requestData.nomineeName,
-          relationToDeceased: requestData.relationToDeceased,
-          phoneNumber: requestData.phoneNumber,
-          email: requestData.email,
-          deathCertificateUrl: requestData.deathCertificateUrl,
-          status: requestData.status,
-        }),
+      const response = await vaultAPI.updateRequest(id, {
+        nomineeId: null,
+        nomineeName: requestData.nomineeName,
+        relationToDeceased: requestData.relationToDeceased,
+        phoneNumber: requestData.phoneNumber,
+        email: requestData.email,
+        deathCertificateUrl: requestData.deathCertificateUrl,
+        status: requestData.status,
       });
 
       console.log('Vault request updated successfully:', response);
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaultRequests', userId] });
+      queryClient.invalidateQueries({ queryKey: ['vaultRequests', user?.id] });
     },
     onError: (error) => {
       console.error('Update vault request mutation error:', error);
@@ -202,14 +164,12 @@ export const useVaultRequests = () => {
         throw new Error('Vault request ID is required for deletion');
       }
       
-      await apiCall(`/vault-requests/${id}`, {
-        method: 'DELETE',
-      });
+      await vaultAPI.deleteRequest(id);
 
       console.log('Vault request deleted successfully');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaultRequests', userId] });
+      queryClient.invalidateQueries({ queryKey: ['vaultRequests', user?.id] });
     },
     onError: (error) => {
       console.error('Delete vault request mutation error:', error);

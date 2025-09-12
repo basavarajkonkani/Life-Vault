@@ -1,7 +1,6 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
-import { supabase } from '../lib/supabase';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,18 +12,11 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
-  async (config) => {
-    try {
-      // Get the current session from Supabase
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.access_token) {
-        config.headers.Authorization = `Bearer ${session.access_token}`;
-      }
-    } catch (error) {
-      console.error('Error getting session for API request:', error);
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    
     return config;
   },
   (error) => {
@@ -35,11 +27,11 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
+  (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid, sign out user
-      await supabase.auth.signOut();
-      window.location.href = '/login';
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      window.location.href = '/';
     }
     
     // Enhanced error logging
@@ -60,47 +52,26 @@ const handleApiError = (error: any, defaultMessage: string = 'An error occurred'
   if (error.response?.data?.error) {
     return error.response.data.error;
   }
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
   if (error.message) {
     return error.message;
   }
   return defaultMessage;
 };
 
-// Auth API
+// Auth API with enhanced error handling
 export const authAPI = {
-  signIn: async (email: string, password: string) => {
+  sendOtp: async (phone: string, role: string) => {
     try {
-      const response = await api.post('/api/auth/signin', { email, password });
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to sign in'));
-    }
-  },
-
-  signUp: async (userData: any) => {
-    try {
-      const response = await api.post('/api/auth/register', userData);
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to create account'));
-    }
-  },
-
-  sendOtp: async (phone: string) => {
-    try {
-      const response = await api.post('/api/auth/send-otp', { phone });
+      const response = await api.post('/auth/send-otp', { phone, role });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to send OTP'));
     }
   },
 
-  verifyOtp: async (phone: string, otp: string) => {
+  verifyOtp: async (phone: string, otp: string, role: string) => {
     try {
-      const response = await api.post('/api/auth/verify-otp', { phone, otp });
+      const response = await api.post('/auth/verify-otp', { phone, otp, role });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to verify OTP'));
@@ -109,7 +80,7 @@ export const authAPI = {
 
   verifyPin: async (userId: string, pin: string) => {
     try {
-      const response = await api.post('/api/auth/verify-pin', { userId, pin });
+      const response = await api.post('/auth/verify-pin', { userId, pin });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to verify PIN'));
@@ -121,82 +92,64 @@ export const authAPI = {
 export const dashboardAPI = {
   getStats: async () => {
     try {
-      const response = await api.get('/api/dashboard/stats');
+      const response = await api.get('/dashboard/stats');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch dashboard statistics'));
     }
   },
-
-  getBatchData: async () => {
-    try {
-      const response = await api.get('/api/dashboard/batch');
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to fetch dashboard data'));
-    }
-  },
-
+  
   getAssets: async () => {
     try {
-      const response = await api.get('/api/dashboard/assets');
+      const response = await api.get('/assets');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch assets'));
     }
   },
-
+  
   getNominees: async () => {
     try {
-      const response = await api.get('/api/dashboard/nominees');
+      const response = await api.get('/nominees');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch nominees'));
     }
   },
-
-  getTradingAccounts: async () => {
-    try {
-      const response = await api.get('/api/dashboard/trading-accounts');
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to fetch trading accounts'));
-    }
-  },
 };
 
-// Assets API
+// Assets API with enhanced error handling
 export const assetsAPI = {
   getAll: async () => {
     try {
-      const response = await api.get('/api/assets');
+      const response = await api.get('/assets');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch assets'));
     }
   },
-
+  
   create: async (assetData: any) => {
     try {
-      const response = await api.post('/api/assets', assetData);
+      const response = await api.post('/assets', assetData);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to create asset'));
     }
   },
-
+  
   update: async (id: string, assetData: any) => {
     try {
-      const response = await api.put(`/api/assets/${id}`, assetData);
+      const response = await api.put(`/assets/${id}`, assetData);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to update asset'));
     }
   },
-
+  
   delete: async (id: string) => {
     try {
-      const response = await api.delete(`/api/assets/${id}`);
+      const response = await api.delete(`/assets/${id}`);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to delete asset'));
@@ -204,38 +157,38 @@ export const assetsAPI = {
   },
 };
 
-// Nominees API
+// Nominees API with enhanced error handling
 export const nomineesAPI = {
   getAll: async () => {
     try {
-      const response = await api.get('/api/nominees');
+      const response = await api.get('/nominees');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch nominees'));
     }
   },
-
+  
   create: async (nomineeData: any) => {
     try {
-      const response = await api.post('/api/nominees', nomineeData);
+      const response = await api.post('/nominees', nomineeData);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to create nominee'));
     }
   },
-
+  
   update: async (id: string, nomineeData: any) => {
     try {
-      const response = await api.put(`/api/nominees/${id}`, nomineeData);
+      const response = await api.put(`/nominees/${id}`, nomineeData);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to update nominee'));
     }
   },
-
+  
   delete: async (id: string) => {
     try {
-      const response = await api.delete(`/api/nominees/${id}`);
+      const response = await api.delete(`/nominees/${id}`);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to delete nominee'));
@@ -243,38 +196,89 @@ export const nomineesAPI = {
   },
 };
 
-// Trading Accounts API
+// Vault API with enhanced error handling
+export const vaultAPI = {
+  getRequests: async () => {
+    try {
+      const response = await api.get('/vault/requests');
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to fetch vault requests'));
+    }
+  },
+  
+  submitRequest: async (requestData: any) => {
+    try {
+      const response = await api.post('/vault/requests', requestData);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to submit vault request'));
+    }
+  },
+  
+  updateStatus: async (id: string, status: string, notes?: string) => {
+    try {
+      const response = await api.put(`/vault/requests/${id}`, { status, notes });
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to update vault request status'));
+    }
+  },
+};
+
+// File Upload API with enhanced error handling
+export const uploadAPI = {
+  uploadFile: async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await api.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000, // 30 second timeout for file uploads
+      });
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to upload file'));
+    }
+  },
+};
+
+// Trading Accounts API with enhanced error handling
 export const tradingAccountsAPI = {
   getAll: async () => {
     try {
-      const response = await api.get('/api/trading-accounts');
+      const response = await api.get('/trading-accounts');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch trading accounts'));
     }
   },
-
+  
   create: async (tradingAccountData: any) => {
     try {
-      const response = await api.post('/api/trading-accounts', tradingAccountData);
+      const response = await api.post('/trading-accounts', tradingAccountData);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to create trading account'));
     }
   },
-
+  
   update: async (id: string, tradingAccountData: any) => {
     try {
-      const response = await api.put(`/api/trading-accounts/${id}`, tradingAccountData);
+      const response = await api.put(`/trading-accounts/${id}`, tradingAccountData);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to update trading account'));
     }
   },
-
+  
   delete: async (id: string) => {
     try {
-      const response = await api.delete(`/api/trading-accounts/${id}`);
+      const response = await api.delete(`/trading-accounts/${id}`);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to delete trading account'));
@@ -282,43 +286,65 @@ export const tradingAccountsAPI = {
   },
 };
 
-// Vault API
-export const vaultAPI = {
-  getRequests: async () => {
+// Health check API
+export const healthAPI = {
+  check: async () => {
     try {
-      const response = await api.get('/api/vault/requests');
+      const response = await api.get('/health');
       return response.data;
     } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to fetch vault requests'));
-    }
-  },
-
-  createRequest: async (requestData: any) => {
-    try {
-      const response = await api.post('/api/vault/requests', requestData);
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to create vault request'));
-    }
-  },
-
-  updateRequest: async (id: string, requestData: any) => {
-    try {
-      const response = await api.put(`/api/vault/requests/${id}`, requestData);
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to update vault request'));
-    }
-  },
-
-  deleteRequest: async (id: string) => {
-    try {
-      const response = await api.delete(`/api/vault/requests/${id}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to delete vault request'));
+      throw new Error(handleApiError(error, 'Health check failed'));
     }
   },
 };
 
 export default api;
+
+// Admin API with enhanced error handling
+export const adminAPI = {
+  getStats: async () => {
+    try {
+      const response = await api.get('/admin/stats');
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to fetch admin statistics'));
+    }
+  },
+  
+  getVaultRequests: async () => {
+    try {
+      const response = await api.get('/admin/vault-requests');
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to fetch vault requests'));
+    }
+  },
+  
+  updateVaultRequestStatus: async (id: string, status: string, notes?: string) => {
+    try {
+      const response = await api.put(`/admin/vault-requests/${id}`, { status, notes });
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, 'Failed to update vault request status'));
+    }
+  },
+  
+  getUsers: async () => {
+    try {
+      const response = await api.get("/admin/users");
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, "Failed to fetch users"));
+    }
+  },
+  
+  createAdmin: async (adminData: any) => {
+    try {
+      const response = await api.post("/admin/create", adminData);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error, "Failed to create admin"));
+    }
+  },
+};
+

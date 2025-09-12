@@ -1,7 +1,7 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,13 +9,16 @@ async function bootstrap() {
   // Enable CORS for frontend communication
   app.enableCors({
     origin: [
-      'http://localhost:3000', 
-      'http://localhost:3001',
-      'http://localhost:3003'
+      "http://localhost:3000", 
+      "http://localhost:3001",
+      "http://localhost:3003",
+      "https://life-vault-frontend-y0a5.onrender.com", // Add your deployed frontend URL
+      "https://*.onrender.com", // Allow all Render subdomains
+      "https://*.vercel.app", // Allow all Vercel subdomains
     ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   });
 
   // Enable validation pipes
@@ -26,13 +29,13 @@ async function bootstrap() {
   }));
 
   // Global prefix for all routes
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
 
   const configService = app.get(ConfigService);
-  const port = configService.get('PORT') || 3001;
+  const port = configService.get("PORT") || 3001;
   
   await app.listen(port);
-  console.log(`�� LifeVault Backend server running on http://localhost:${port}`);
+  console.log(`🚀 LifeVault Backend server running on http://localhost:${port}`);
   console.log(`📊 Supabase connected successfully`);
   console.log(`🔐 JWT authentication enabled`);
   console.log(`📁 File uploads enabled`);

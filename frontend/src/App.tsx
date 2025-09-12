@@ -1,25 +1,26 @@
-import React, { Suspense, lazy, memo } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { NotificationProvider } from './contexts/NotificationContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import ErrorBoundary from './components/ErrorBoundary';
-import LoadingSpinner from './components/LoadingSpinner';
-import ResponsiveLayout from './components/ResponsiveLayout';
-import Login from './pages/Login';
-import './App.css';
+import React, { Suspense, lazy, memo } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { NotificationProvider } from "./contexts/NotificationContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import ErrorBoundary from "./components/ErrorBoundary";
+import LoadingSpinner from "./components/LoadingSpinner";
+import ResponsiveLayout from "./components/ResponsiveLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
+import "./App.css";
 
 // Lazy load components for better performance with error boundaries
-const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard'));
-const NomineeDashboard = lazy(() => import('./pages/NomineeDashboard'));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const Assets = lazy(() => import('./pages/Assets'));
-const Nominees = lazy(() => import('./pages/Nominees'));
-const Vault = lazy(() => import('./pages/Vault'));
-const ClaimGuides = lazy(() => import('./pages/ClaimGuides'));
-const Reports = lazy(() => import('./pages/Reports'));
-const Settings = lazy(() => import('./pages/Settings'));
-const TradingAccounts = lazy(() => import('./pages/TradingAccounts'));
+const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard"));
+const NomineeDashboard = lazy(() => import("./pages/NomineeDashboard"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Assets = lazy(() => import("./pages/Assets"));
+const Nominees = lazy(() => import("./pages/Nominees"));
+const Vault = lazy(() => import("./pages/Vault"));
+const ClaimGuides = lazy(() => import("./pages/ClaimGuides"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Settings = lazy(() => import("./pages/Settings"));
+const TradingAccounts = lazy(() => import("./pages/TradingAccounts"));
 
 // Create a client with optimized settings for better performance
 const queryClient = new QueryClient({
@@ -37,63 +38,136 @@ const queryClient = new QueryClient({
     },
   },
 });
+
 // Memoized navigation items for better performance
 const getNavigationItems = (userRole: string) => {
   const baseItems = [
-    { path: '/', label: 'Dashboard', icon: 'Home' },
-    { path: '/assets', label: 'Assets', icon: 'TrendingUp' },
-    { path: '/nominees', label: 'Nominees', icon: 'Users' },
-    { path: '/vault', label: 'Vault', icon: 'Lock' },
-    { path: '/trading-accounts', label: 'Trading Accounts', icon: 'Building2' },
+    { path: "/", label: "Dashboard", icon: "Home" },
+    { path: "/assets", label: "Assets", icon: "TrendingUp" },
+    { path: "/nominees", label: "Nominees", icon: "Users" },
+    { path: "/vault", label: "Vault", icon: "Lock" },
+    { path: "/trading-accounts", label: "Trading Accounts", icon: "Building2" },
   ];
 
   const roleSpecificItems = {
     owner: [
       ...baseItems,
-      { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
-      { path: '/reports', label: 'Reports', icon: 'TrendingUp' },
-      { path: '/settings', label: 'Settings', icon: 'Settings' },
+      { path: "/claim-guides", label: "Claim Guides", icon: "BookOpen" },
+      { path: "/reports", label: "Reports", icon: "TrendingUp" },
+      { path: "/settings", label: "Settings", icon: "Settings" },
     ],
     nominee: [
-      { path: '/', label: 'Dashboard', icon: 'Home' },
-      { path: '/vault', label: 'Vault', icon: 'Lock' },
-      { path: '/claim-guides', label: 'Claim Guides', icon: 'BookOpen' },
+      { path: "/", label: "Dashboard", icon: "Home" },
+      { path: "/vault", label: "Vault", icon: "Lock" },
+      { path: "/claim-guides", label: "Claim Guides", icon: "BookOpen" },
     ],
     admin: [
       ...baseItems,
-      { path: '/reports', label: 'Reports', icon: 'TrendingUp' },
-      { path: '/settings', label: 'Settings', icon: 'Settings' },
+      { path: "/reports", label: "Reports", icon: "TrendingUp" },
+      { path: "/settings", label: "Settings", icon: "Settings" },
     ],
   };
 
   return roleSpecificItems[userRole as keyof typeof roleSpecificItems] || baseItems;
 };
 
-// Memoized main app component
+// Main app component with proper routing
 const MainApp = memo(() => {
-  const { user, signOut } = useAuth();
-  const navigationItems = getNavigationItems(user?.role || 'owner');
+  const { user, userProfile, loading } = useAuth();
+
+  console.log("MainApp - Auth state:", { user: !!user, userProfile: !!userProfile, loading });
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    console.log("MainApp - Loading...");
+    return <LoadingSpinner />;
+  }
+
+  // If not authenticated, redirect to login
+  if (!user || !userProfile) {
+    console.log("MainApp - Not authenticated, redirecting to login");
+    return <Navigate to="/login" replace />;
+  }
+
+  console.log("MainApp - Authenticated, showing app");
+  // If authenticated, show the main app
+  return <AuthenticatedApp />;
+});
+
+// Authenticated app component
+const AuthenticatedApp = memo(() => {
+  const { userProfile, signOut } = useAuth();
+  const navigationItems = getNavigationItems(userProfile?.role || "owner");
 
   return (
-    <ResponsiveLayout user={user} onLogout={signOut} navigationItems={navigationItems}>
+    <ResponsiveLayout user={userProfile} onLogout={signOut} navigationItems={navigationItems}>
       <Routes>
-        <Route path="/login" element={<Login />} />
         <Route 
           path="/" 
           element={
-            user?.role === 'owner' ? <OwnerDashboard /> :
-            user?.role === 'nominee' ? <NomineeDashboard /> :
-            user?.role === 'admin' ? <AdminDashboard /> :
+            userProfile?.role === "owner" ? <OwnerDashboard /> :
+            userProfile?.role === "nominee" ? <NomineeDashboard /> :
+            userProfile?.role === "admin" ? <AdminDashboard /> :
             <OwnerDashboard />
           } 
         />
-        <Route path="/assets" element={<Assets />} />
-        <Route path="/nominees" element={<Nominees />} />
-        <Route path="/vault" element={<Vault />} />
-        <Route path="/trading-accounts" element={<TradingAccounts />} />
-        <Route path="/claim-guides" element={<ClaimGuides />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route 
+          path="/assets" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Assets />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/nominees" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Nominees />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/vault" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "nominee", "admin"]}>
+              <Vault />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/trading-accounts" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <TradingAccounts />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/claim-guides" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "nominee", "admin"]}>
+              <ClaimGuides />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/reports" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Reports />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Settings />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ResponsiveLayout>
   );
@@ -107,7 +181,12 @@ const AppContent = memo(() => {
         <AuthProvider>
           <ErrorBoundary>
             <Suspense fallback={<LoadingSpinner />}>
-              <MainApp />
+              <Router>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/*" element={<MainApp />} />
+                </Routes>
+              </Router>
             </Suspense>
           </ErrorBoundary>
         </AuthProvider>
@@ -118,17 +197,10 @@ const AppContent = memo(() => {
 
 // Main App component with performance optimizations
 const App: React.FC = () => {
-  // Clear query cache on app start for fresh data
-  React.useEffect(() => {
-    queryClient.clear();
-  }, []);
-
   return (
-    <Router>
-      <div className="App optimize-rendering">
-        <AppContent />
-      </div>
-    </Router>
+    <div className="App optimize-rendering">
+      <AppContent />
+    </div>
   );
 };
 

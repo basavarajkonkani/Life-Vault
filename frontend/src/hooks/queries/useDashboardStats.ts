@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { getUserIdSync, ensureDemoUser } from '../../lib/supabase';
-import { useAuth } from '../useAuth';
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../useAuth";
+import { dashboardAPI } from "../../services/api";
 
 interface DashboardStats {
   totalAssets: number;
@@ -18,91 +18,67 @@ interface BatchedDashboardData extends DashboardStats {
   tradingAccounts: any[];
 }
 
-const demoStats: DashboardStats = {
-  totalAssets: 6,
-  totalNominees: 2,
-  totalTradingAccounts: 3,
-  totalValue: 3000000,
-  netWorth: 3000000,
-  assetAllocation: [
-    { name: 'Bank Account', value: 16.7, amount: 500000, color: '#1E3A8A' },
-    { name: 'Fixed Deposit', value: 33.3, amount: 1000000, color: '#3B82F6' },
-    { name: 'Mutual Fund', value: 25.0, amount: 750000, color: '#60A5FA' },
-    { name: 'LIC Policy', value: 8.3, amount: 250000, color: '#93C5FD' },
-    { name: 'Trading Account (Zerodha)', value: 10.0, amount: 300000, color: '#A78BFA' },
-    { name: 'Trading Account (Upstox)', value: 6.7, amount: 200000, color: '#DBEAFE' }
-  ],
-  recentActivity: []
-};
-
-// Backend API base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-// Helper function to make authenticated API calls
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  const token = 'demo-token';
-  
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
-};
-
 export const useDashboardStats = () => {
-  const { getUserId } = useAuth();
+  const { user, userProfile } = useAuth();
   
-  // Get user ID with fallback
-  const userId = getUserId() || getUserIdSync() || ensureDemoUser()?.id;
-
   const { data: batchedData, isLoading, isError, error, refetch } = useQuery<BatchedDashboardData, Error>({
-    queryKey: ['dashboardBatch', userId],
+    queryKey: ["dashboardBatch", user?.id],
     queryFn: async () => {
-      if (!userId) {
-        console.warn('No user ID available, returning demo data');
-        return {
-          ...demoStats,
-          assets: [],
-          nominees: [],
-          tradingAccounts: []
-        };
+      if (!user || !userProfile) {
+        throw new Error("User not authenticated");
       }
 
       try {
-        console.log('Fetching batched dashboard data for user ID:', userId);
+        console.log("Fetching batched dashboard data for user ID:", user.id);
         
-        // Single API call to get all dashboard data
-        const response = await apiCall('/dashboard/batch');
-        
-        console.log('Batched dashboard data received successfully');
-        return response;
+        // Try to get batched data first
+        try {
+          const response = await dashboardAPI.getBatchData();
+          console.log("Batched dashboard data received successfully");
+          return response;
+        } catch (batchError) {
+          console.warn("Batch API not available, fetching individual data:", batchError);
+          
+          // Fallback to individual API calls
+          const [assets, nominees, tradingAccounts] = await Promise.all([
+            dashboardAPI.getAssets().catch(() => []),
+            dashboardAPI.getNominees().catch(() => []),
+            dashboardAPI.getTradingAccounts().catch(() => [])
+          ]);
+
+          // Calculate stats from individual data
+          const totalValue = assets.reduce((sum: number, asset: any) => sum + (asset.current_value || 0), 0);
+          const assetAllocation = assets.map((asset: any, index: number) => ({
+            name: asset.category || `Asset ${index + 1}`,
+            value: totalValue > 0 ? (asset.current_value / totalValue) * 100 : 0,
+            amount: asset.current_value || 0,
+            color: `hsl(${(index * 137.5) % 360}, 70%, 50%)`
+          }));
+
+          return {
+            totalAssets: assets.length,
+            totalNominees: nominees.length,
+            totalTradingAccounts: tradingAccounts.length,
+            totalValue,
+            netWorth: totalValue,
+            assetAllocation,
+            recentActivity: [],
+            assets,
+            nominees,
+            tradingAccounts
+          };
+        }
       } catch (err) {
-        console.error('Error fetching batched dashboard data:', err);
-        return {
-          ...demoStats,
-          assets: [],
-          nominees: [],
-          tradingAccounts: []
-        };
+        console.error("Error fetching dashboard data:", err);
+        throw new Error("Failed to fetch dashboard data");
       }
     },
-    enabled: !!userId,
-    staleTime: 10 * 60 * 1000, // 10 minutes - increased from 5
+    enabled: !!user && !!userProfile,
+    staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
-    retry: 1, // Reduced retries for faster failure
+    retry: 1,
     refetchOnWindowFocus: false,
-    refetchOnMount: false, // Don't refetch if data exists
+    refetchOnMount: false,
   });
 
   // Extract stats from batched data
@@ -114,7 +90,15 @@ export const useDashboardStats = () => {
     netWorth: batchedData.netWorth,
     assetAllocation: batchedData.assetAllocation,
     recentActivity: batchedData.recentActivity
-  } : demoStats;
+  } : {
+    totalAssets: 0,
+    totalNominees: 0,
+    totalTradingAccounts: 0,
+    totalValue: 0,
+    netWorth: 0,
+    assetAllocation: [],
+    recentActivity: []
+  };
 
   return {
     stats,
@@ -122,7 +106,7 @@ export const useDashboardStats = () => {
     isError,
     error,
     refetch,
-    showDemoDataNotice: isError || (stats === demoStats && !isLoading),
+    showDemoDataNotice: false, // Remove demo data notice
     // Additional data for other components
     assets: batchedData?.assets || [],
     nominees: batchedData?.nominees || [],

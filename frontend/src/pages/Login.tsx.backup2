@@ -1,0 +1,540 @@
+import React, { useState } from 'react';
+import { Shield, User, Users, Settings, Mail, Lock, Phone } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
+
+interface LoginProps {
+  onLogin?: (authenticated: boolean, user: any) => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const [step, setStep] = useState<'role' | 'auth' | 'otp' | 'signup'>('role');
+  const [selectedRole, setSelectedRole] = useState<'owner' | 'nominee' | 'admin' | null>(null);
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    phone: '',
+    name: '',
+    address: '',
+    confirmPassword: ''
+  });
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const { signIn, signUp, signInWithOtp, verifyOtp } = useAuth();
+  const { showError, showSuccess } = useNotification();
+
+  const roleOptions = [
+    {
+      value: 'owner',
+      label: 'Asset Owner',
+      description: 'Manage your assets and nominees',
+      icon: User,
+      color: 'bg-blue-500'
+    },
+    {
+      value: 'nominee',
+      label: 'Nominee',
+      description: 'Access assigned assets when needed',
+      icon: Users,
+      color: 'bg-green-500'
+    },
+    {
+      value: 'admin',
+      label: 'Admin',
+      description: 'Review and approve vault requests',
+      icon: Settings,
+      color: 'bg-purple-500'
+    }
+  ];
+
+  const handleRoleSelection = (role: 'owner' | 'nominee' | 'admin') => {
+    setSelectedRole(role);
+    setStep('auth');
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error } = await signIn(formData.email, formData.password);
+      
+      if (error) {
+        setError(error.message);
+        showError('Login Failed', error.message);
+      } else {
+        showSuccess('Login Successful', 'Welcome back!');
+        onLogin?.(true, null);
+      }
+    } catch (error) {
+      const errorMessage = 'An unexpected error occurred';
+      setError(errorMessage);
+      showError('Login Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhoneSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error } = await signInWithOtp(formData.phone);
+      
+      if (error) {
+        setError(error.message);
+        showError('OTP Send Failed', error.message);
+      } else {
+        setStep('otp');
+        showSuccess('OTP Sent', 'Please check your phone for the verification code');
+      }
+    } catch (error) {
+      const errorMessage = 'An unexpected error occurred';
+      setError(errorMessage);
+      showError('OTP Send Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error } = await verifyOtp(formData.phone, otp);
+      
+      if (error) {
+        setError(error.message);
+        showError('OTP Verification Failed', error.message);
+      } else {
+        showSuccess('Login Successful', 'Welcome back!');
+        onLogin?.(true, null);
+      }
+    } catch (error) {
+      const errorMessage = 'An unexpected error occurred';
+      setError(errorMessage);
+      showError('OTP Verification Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await signUp(formData.email, formData.password, {
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        role: selectedRole || 'owner'
+      });
+      
+      if (error) {
+        setError(error.message);
+        showError('Sign Up Failed', error.message);
+      } else {
+        showSuccess('Account Created', 'Please check your email to verify your account');
+        setStep('auth');
+      }
+    } catch (error) {
+      const errorMessage = 'An unexpected error occurred';
+      setError(errorMessage);
+      showError('Sign Up Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 'auth') {
+      setStep('role');
+    } else if (step === 'otp') {
+      setStep('auth');
+    } else if (step === 'signup') {
+      setStep('auth');
+    }
+  };
+
+  const renderRoleSelection = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-primary-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to LifeVault</h2>
+        <p className="text-gray-600">Select your role to continue</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {roleOptions.map((option) => {
+          const IconComponent = option.icon;
+          return (
+            <button
+              key={option.value}
+              onClick={() => handleRoleSelection(option.value as 'owner' | 'nominee' | 'admin')}
+              className={`p-4 rounded-lg border-2 border-gray-200 hover:border-primary-500 transition-colors text-left ${option.color} bg-opacity-10 hover:bg-opacity-20`}
+            >
+              <div className="flex items-center">
+                <div className={`p-2 rounded-lg ${option.color} mr-4`}>
+                  <IconComponent className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{option.label}</h3>
+                  <p className="text-sm text-gray-600">{option.description}</p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderAuthMethod = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-primary-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign In</h2>
+        <p className="text-gray-600">Choose your preferred sign-in method</p>
+      </div>
+
+      <div className="flex space-x-4 mb-6">
+        <button
+          onClick={() => setAuthMethod('email')}
+          className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+            authMethod === 'email' 
+              ? 'border-primary-500 bg-primary-50 text-primary-700' 
+              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+          }`}
+        >
+          <Mail className="w-4 h-4 inline mr-2" />
+          Email
+        </button>
+        <button
+          onClick={() => setAuthMethod('phone')}
+          className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+            authMethod === 'phone' 
+              ? 'border-primary-500 bg-primary-50 text-primary-700' 
+              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+          }`}
+        >
+          <Phone className="w-4 h-4 inline mr-2" />
+          Phone
+        </button>
+      </div>
+
+      {authMethod === 'email' ? (
+        <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              placeholder="Enter your email"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder="Enter your password"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="text-red-600 text-sm">{error}</div>
+          )}
+
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+            >
+              {loading ? 'Signing In...' : 'Sign In'}
+            </button>
+          </div>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setStep('signup')}
+              className="text-primary-600 hover:text-primary-700 text-sm"
+            >
+              Don't have an account? Sign up
+            </button>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={handlePhoneSignIn} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleInputChange}
+              placeholder="+91 9876543210"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="text-red-600 text-sm">{error}</div>
+          )}
+
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+            >
+              {loading ? 'Sending OTP...' : 'Send OTP'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+
+  const renderOtpVerification = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-primary-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Enter OTP</h2>
+        <p className="text-gray-600">Enter the 6-digit code sent to {formData.phone}</p>
+      </div>
+
+      <form onSubmit={handleOtpVerification} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            OTP Code
+          </label>
+          <input
+            type="text"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="123456"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-center text-lg tracking-widest"
+            maxLength={6}
+            required
+          />
+        </div>
+
+        {error && (
+          <div className="text-red-600 text-sm">{error}</div>
+        )}
+
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+          >
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={loading || otp.length !== 6}
+            className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'Verify OTP'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
+  const renderSignUp = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+          <User className="w-8 h-8 text-primary-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Account</h2>
+        <p className="text-gray-600">Sign up as {selectedRole}</p>
+      </div>
+
+      <form onSubmit={handleSignUp} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Full Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder="Enter your full name"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email Address
+          </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="Enter your email"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Phone Number
+          </label>
+          <input
+            type="tel"
+            name="phone"
+            value={formData.phone}
+            onChange={handleInputChange}
+            placeholder="+91 9876543210"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Address (Optional)
+          </label>
+          <input
+            type="text"
+            name="address"
+            value={formData.address}
+            onChange={handleInputChange}
+            placeholder="Enter your address"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Password
+          </label>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleInputChange}
+            placeholder="Create a password"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Confirm Password
+          </label>
+          <input
+            type="password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
+            placeholder="Confirm your password"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            required
+          />
+        </div>
+
+        {error && (
+          <div className="text-red-600 text-sm">{error}</div>
+        )}
+
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+          >
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+          >
+            {loading ? 'Creating Account...' : 'Create Account'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {step === 'role' && renderRoleSelection()}
+          {step === 'auth' && renderAuthMethod()}
+          {step === 'otp' && renderOtpVerification()}
+          {step === 'signup' && renderSignUp()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;

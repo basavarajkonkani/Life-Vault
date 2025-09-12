@@ -8,19 +8,69 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors({
-  origin: [
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "http://localhost:3001", 
+      "http://localhost:3003",
+      "https://life-vault-frontend-y0a5.onrender.com",
+      "https://life-vault-frontend.onrender.com"
+    ];
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+    "Access-Control-Request-Method",
+    "Access-Control-Request-Headers"
+  ],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Additional CORS headers middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
     "http://localhost:3000",
     "http://localhost:3001", 
     "http://localhost:3003",
     "https://life-vault-frontend-y0a5.onrender.com",
     "https://life-vault-frontend.onrender.com"
-  ],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  optionsSuccessStatus: 200}));
+  ];
+  
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
+
 app.use(express.json());
 
 // Supabase client
@@ -48,821 +98,676 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Demo token middleware (for testing)
-const authenticateDemoToken = (req, res, next) => {
+const demoTokenMiddleware = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (token === 'demo-token') {
-    req.user = { sub: '22ce220b-e5a2-4a51-80ac-a7737c97decd', phone: '+91 9876543210', role: 'user' };
+    req.user = { id: '550e8400-e29b-41d4-a716-446655440000', role: 'owner' };
     return next();
   }
 
-  // Fall back to JWT authentication
-  authenticateToken(req, res, next);
-};
-
-// Validation helpers
-const validateEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const validatePhone = (phone) => {
-  const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
-  return phoneRegex.test(phone);
-};
-
-const validateNomineeData = (data) => {
-  const errors = [];
-
-  if (!data.name || data.name.trim().length === 0) {
-    errors.push('Name is required');
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
   }
 
-  if (!data.relation || data.relation.trim().length === 0) {
-    errors.push('Relation is required');
-  }
-
-  if (!data.phone || data.phone.trim().length === 0) {
-    errors.push('Phone number is required');
-  } else if (!validatePhone(data.phone)) {
-    errors.push('Please enter a valid phone number');
-  }
-
-  if (!data.email || data.email.trim().length === 0) {
-    errors.push('Email is required');
-  } else if (!validateEmail(data.email)) {
-    errors.push('Please enter a valid email address');
-  }
-
-  if (data.allocationPercentage === undefined || data.allocationPercentage === null) {
-    errors.push('Allocation percentage is required');
-  } else {
-    const allocation = parseFloat(data.allocationPercentage);
-    if (isNaN(allocation) || allocation < 0 || allocation > 100) {
-      errors.push('Allocation percentage must be between 0 and 100');
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
     }
-  }
-
-  return errors;
+    req.user = user;
+    next();
+  });
 };
 
-const validateAssetData = (data) => {
-  const errors = [];
-
-  if (!data.category || data.category.trim().length === 0) {
-    errors.push('Category is required');
-  }
-
-  if (!data.institution || data.institution.trim().length === 0) {
-    errors.push('Institution is required');
-  }
-
-  if (!data.accountNumber || data.accountNumber.trim().length === 0) {
-    errors.push('Account number is required');
-  }
-
-  if (data.currentValue === undefined || data.currentValue === null) {
-    errors.push('Current value is required');
-  } else {
-    const value = parseFloat(data.currentValue);
-    if (isNaN(value) || value < 0) {
-      errors.push('Current value must be a positive number');
-    }
-  }
-
-  return errors;
-};
-
-const validateTradingAccountData = (data) => {
-  const errors = [];
-
-  if (!data.brokerName || data.brokerName.trim().length === 0) {
-    errors.push('Broker name is required');
-  }
-
-  if (!data.clientId || data.clientId.trim().length === 0) {
-    errors.push('Client ID is required');
-  }
-
-  if (!data.dematNumber || data.dematNumber.trim().length === 0) {
-    errors.push('Demat number is required');
-  }
-
-  if (data.currentValue === undefined || data.currentValue === null) {
-    errors.push('Current value is required');
-  } else {
-    const value = parseFloat(data.currentValue);
-    if (isNaN(value) || value < 0) {
-      errors.push('Current value must be a positive number');
-    }
-  }
-
-  return errors;
-};
-
-// Routes
-app.get('/api/', (req, res) => {
-  res.json({ message: 'LifeVault API is running!', endpoints: [
-    '/api/health',
-    '/api/auth/login',
-    '/api/auth/register',
-    '/api/dashboard/stats',
-    '/api/dashboard/batch',
-    '/api/assets',
-    '/api/nominees',
-    '/api/trading-accounts',
-    '/api/vault-requests'
-  ], timestamp: new Date().toISOString() });
-});
+// Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ message: 'LifeVault Backend is running!', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    message: 'Life Vault Backend is running'
+  });
 });
 
-// Auth routes
+// Auth endpoints
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, phone, email, address, pin, role } = req.body;
+    const { email, password, name, phone, address, role } = req.body;
 
     // Check if user already exists
     const { data: existingUser } = await supabase
       .from('users')
-      .select('*')
-      .eq('phone', phone)
+      .select('id')
+      .eq('email', email)
       .single();
 
     if (existingUser) {
-      return res.status(409).json({ error: 'User with this phone number already exists' });
+      return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash the PIN
-    const pinHash = await bcrypt.hash(pin, 10);
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { name, phone, address, role: role || 'owner' }
+    });
 
-    // Create user
-    const { data: user, error } = await supabase
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // Create user profile in users table
+    const { error: profileError } = await supabase
       .from('users')
       .insert({
+        id: authData.user.id,
         name,
-        phone,
         email,
-        address,
-        pin_hash: pinHash,
-        role: role || 'user',
-        is_active: true,
-      })
-      .select()
-      .single();
+        phone: phone || '',
+        address: address || '',
+        role: role || 'owner',
+        is_active: true
+      });
 
-    if (error) {
-      throw error;
+    if (profileError) {
+      console.error('Error creating user profile:', profileError);
+      return res.status(500).json({ error: 'Failed to create user profile' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { sub: user.id, phone: user.phone, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
+    res.json({ 
+      success: true, 
+      message: 'User created successfully',
       user: {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        email: user.email,
-        address: user.address,
-        role: user.role,
-        is_active: user.is_active,
-      },
-      token,
+        id: authData.user.id,
+        email,
+        name,
+        role: role || 'owner'
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/send-otp', async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    // For demo purposes, just return success
+    res.json({ 
+      success: true, 
+      message: 'OTP sent successfully (demo mode)',
+      otp: '123456' // Demo OTP
+    });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { phone, otp } = req.body;
 
-    // Find user by phone
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('phone', phone)
-      .single();
-
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid phone number' });
+    // For demo purposes, accept any OTP
+    if (otp === '123456' || otp === 'demo') {
+      res.json({ 
+        success: true, 
+        message: 'OTP verified successfully',
+        requiresPin: true
+      });
+    } else {
+      res.status(400).json({ error: 'Invalid OTP' });
     }
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    if (!user.is_active) {
-      return res.status(401).json({ error: 'Account is deactivated' });
-    }
+app.post('/api/auth/verify-pin', async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
 
-    // For demo purposes, accept any 6-digit OTP
-    if (!otp || otp.length !== 6) {
-      return res.status(401).json({ error: 'Invalid OTP' });
-    }
-
-    // Generate JWT token
+    // For demo purposes, accept any PIN
     const token = jwt.sign(
-      { sub: user.id, phone: user.phone, role: user.role },
+      { id: userId, role: 'owner' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        email: user.email,
-        address: user.address,
-        role: user.role,
-        is_active: user.is_active,
-      },
+    res.json({ 
+      success: true, 
+      message: 'PIN verified successfully',
       token,
+      user: { id: userId, role: 'owner' }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('Verify PIN error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/api/auth/verify-pin', authenticateDemoToken, async (req, res) => {
+// Dashboard endpoints
+app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
   try {
-    const { pin } = req.body;
-    const userId = req.user.sub;
+    const userId = req.user.id;
 
-    // Get user
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    // Get counts from database
+    const [assetsResult, nomineesResult, tradingAccountsResult] = await Promise.all([
+      supabase.from('assets').select('id, current_value').eq('user_id', userId),
+      supabase.from('nominees').select('id').eq('user_id', userId),
+      supabase.from('trading_accounts').select('id, current_value').eq('user_id', userId)
+    ]);
 
-    if (error || !user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
+    const assets = assetsResult.data || [];
+    const nominees = nomineesResult.data || [];
+    const tradingAccounts = tradingAccountsResult.data || [];
 
-    // Verify PIN
-    const isPinValid = await bcrypt.compare(pin, user.pin_hash);
-    if (!isPinValid) {
-      return res.status(401).json({ error: 'Invalid PIN' });
-    }
+    const totalValue = assets.reduce((sum, asset) => sum + (asset.current_value || 0), 0);
+    const tradingValue = tradingAccounts.reduce((sum, account) => sum + (account.current_value || 0), 0);
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { sub: user.id, phone: user.phone, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Calculate asset allocation
+    const assetAllocation = assets.map((asset, index) => ({
+      name: asset.category || `Asset ${index + 1}`,
+      value: totalValue > 0 ? (asset.current_value / totalValue) * 100 : 0,
+      amount: asset.current_value || 0,
+      color: `hsl(${(index * 137.5) % 360}, 70%, 50%)`
+    }));
 
     res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        email: user.email,
-        address: user.address,
-        role: user.role,
-        is_active: user.is_active,
-      },
-      token,
-    });
-  } catch (error) {
-    console.error('PIN verification error:', error);
-    res.status(500).json({ error: 'PIN verification failed' });
-  }
-});
-
-// Dashboard routes
-app.get('/api/dashboard/stats', authenticateDemoToken, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-
-    // Get assets
-    const { data: assets } = await supabase
-      .from('assets')
-      .select('current_value')
-      .eq('user_id', userId);
-
-    // Get nominees count
-    const { count: nomineesCount } = await supabase
-      .from('nominees')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    // Get trading accounts count
-    const { count: tradingAccountsCount } = await supabase
-      .from('trading_accounts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    const totalValue = assets?.reduce((sum, asset) => sum + parseFloat(asset.current_value || 0), 0) || 0;
-
-    res.json({
-      totalAssets: assets?.length || 0,
+      totalAssets: assets.length,
+      totalNominees: nominees.length,
+      totalTradingAccounts: tradingAccounts.length,
       totalValue,
-      totalNominees: nomineesCount || 0,
-      totalTradingAccounts: tradingAccountsCount || 0,
+      netWorth: totalValue + tradingValue,
+      assetAllocation,
+      recentActivity: []
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
-    res.status(500).json({ error: 'Failed to get dashboard stats' });
+    res.status(500).json({ error: 'Failed to fetch dashboard statistics' });
   }
 });
 
-// Assets routes
-app.get('/api/dashboard/assets', authenticateDemoToken, async (req, res) => {
+app.get('/api/dashboard/batch', demoTokenMiddleware, async (req, res) => {
   try {
-    const userId = req.user.sub;
+    const userId = req.user.id;
+
+    // Get all data in parallel
+    const [assetsResult, nomineesResult, tradingAccountsResult] = await Promise.all([
+      supabase.from('assets').select('*').eq('user_id', userId),
+      supabase.from('nominees').select('*').eq('user_id', userId),
+      supabase.from('trading_accounts').select('*').eq('user_id', userId)
+    ]);
+
+    const assets = assetsResult.data || [];
+    const nominees = nomineesResult.data || [];
+    const tradingAccounts = tradingAccountsResult.data || [];
+
+    const totalValue = assets.reduce((sum, asset) => sum + (asset.current_value || 0), 0);
+    const tradingValue = tradingAccounts.reduce((sum, account) => sum + (account.current_value || 0), 0);
+
+    // Calculate asset allocation
+    const assetAllocation = assets.map((asset, index) => ({
+      name: asset.category || `Asset ${index + 1}`,
+      value: totalValue > 0 ? (asset.current_value / totalValue) * 100 : 0,
+      amount: asset.current_value || 0,
+      color: `hsl(${(index * 137.5) % 360}, 70%, 50%)`
+    }));
+
+    res.json({
+      totalAssets: assets.length,
+      totalNominees: nominees.length,
+      totalTradingAccounts: tradingAccounts.length,
+      totalValue,
+      netWorth: totalValue + tradingValue,
+      assetAllocation,
+      recentActivity: [],
+      assets,
+      nominees,
+      tradingAccounts
+    });
+  } catch (error) {
+    console.error('Dashboard batch error:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+app.get('/api/dashboard/assets', demoTokenMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
     const { data: assets, error } = await supabase
       .from('assets')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch assets' });
+    }
+
     res.json(assets || []);
   } catch (error) {
-    console.error('Get assets error:', error);
-    res.status(500).json({ error: 'Failed to get assets' });
+    console.error('Dashboard assets error:', error);
+    res.status(500).json({ error: 'Failed to fetch assets' });
   }
 });
 
-app.post('/api/assets', authenticateDemoToken, async (req, res) => {
+app.get('/api/dashboard/nominees', demoTokenMiddleware, async (req, res) => {
   try {
-    const userId = req.user.sub;
-    const { category, institution, accountNumber, currentValue, status, notes, documents } = req.body;
-
-    // Validate input data
-    const validationErrors = validateAssetData({
-      category,
-      institution,
-      accountNumber,
-      currentValue
-    });
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      });
-    }
-
-    const { data: asset, error } = await supabase
-      .from('assets')
-      .insert({
-        user_id: userId,
-        category,
-        institution,
-        account_number: accountNumber,
-        current_value: parseFloat(currentValue),
-        status: status || 'Active',
-        notes,
-        documents: documents || [],
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json(asset);
-  } catch (error) {
-    console.error('Create asset error:', error);
-    res.status(500).json({ error: 'Failed to create asset' });
-  }
-});
-
-app.put('/api/assets/:id', authenticateDemoToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.sub;
-    const { category, institution, accountNumber, currentValue, status, notes, documents } = req.body;
-
-    // Validate input data
-    const validationErrors = validateAssetData({
-      category,
-      institution,
-      accountNumber,
-      currentValue
-    });
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      });
-    }
-
-    // First check if asset belongs to user
-    const { data: existingAsset } = await supabase
-      .from('assets')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existingAsset) {
-      return res.status(404).json({ error: 'Asset not found' });
-    }
-
-    const { data: asset, error } = await supabase
-      .from('assets')
-      .update({
-        category,
-        institution,
-        account_number: accountNumber,
-        current_value: parseFloat(currentValue),
-        status: status || 'Active',
-        notes,
-        documents: documents || [],
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json(asset);
-  } catch (error) {
-    console.error('Update asset error:', error);
-    res.status(500).json({ error: 'Failed to update asset' });
-  }
-});
-
-app.delete('/api/assets/:id', authenticateDemoToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.sub;
-
-    // First check if asset belongs to user
-    const { data: existingAsset } = await supabase
-      .from('assets')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existingAsset) {
-      return res.status(404).json({ error: 'Asset not found' });
-    }
-
-    const { error } = await supabase
-      .from('assets')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Delete asset error:', error);
-    res.status(500).json({ error: 'Failed to delete asset' });
-  }
-});
-
-// Nominees routes
-app.get('/api/dashboard/nominees', authenticateDemoToken, async (req, res) => {
-  try {
-    const userId = req.user.sub;
+    const userId = req.user.id;
     const { data: nominees, error } = await supabase
       .from('nominees')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch nominees' });
+    }
+
     res.json(nominees || []);
   } catch (error) {
-    console.error('Get nominees error:', error);
-    res.status(500).json({ error: 'Failed to get nominees' });
+    console.error('Dashboard nominees error:', error);
+    res.status(500).json({ error: 'Failed to fetch nominees' });
   }
 });
 
-app.post('/api/nominees', authenticateDemoToken, async (req, res) => {
+app.get('/api/dashboard/trading-accounts', demoTokenMiddleware, async (req, res) => {
   try {
-    const userId = req.user.sub;
-    const { name, relation, phone, email, allocationPercentage, isExecutor, isBackup } = req.body;
-
-    // Validate input data
-    const validationErrors = validateNomineeData({
-      name,
-      relation,
-      phone,
-      email,
-      allocationPercentage
-    });
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      });
-    }
-
-    const { data: nominee, error } = await supabase
-      .from('nominees')
-      .insert({
-        user_id: userId,
-        name: name.trim(),
-        relation: relation.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        allocation_percentage: parseFloat(allocationPercentage),
-        is_executor: isExecutor || false,
-        is_backup: isBackup || false,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json(nominee);
-  } catch (error) {
-    console.error('Create nominee error:', error);
-    res.status(500).json({ error: 'Failed to create nominee' });
-  }
-});
-
-app.put('/api/nominees/:id', authenticateDemoToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.sub;
-    const { name, relation, phone, email, allocationPercentage, isExecutor, isBackup } = req.body;
-
-    // Validate input data
-    const validationErrors = validateNomineeData({
-      name,
-      relation,
-      phone,
-      email,
-      allocationPercentage
-    });
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      });
-    }
-
-    // First check if nominee belongs to user
-    const { data: existingNominee } = await supabase
-      .from('nominees')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existingNominee) {
-      return res.status(404).json({ error: 'Nominee not found' });
-    }
-
-    const { data: nominee, error } = await supabase
-      .from('nominees')
-      .update({
-        name: name.trim(),
-        relation: relation.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        allocation_percentage: parseFloat(allocationPercentage),
-        is_executor: isExecutor || false,
-        is_backup: isBackup || false,
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json(nominee);
-  } catch (error) {
-    console.error('Update nominee error:', error);
-    res.status(500).json({ error: 'Failed to update nominee' });
-  }
-});
-
-app.delete('/api/nominees/:id', authenticateDemoToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.sub;
-
-    // First check if nominee belongs to user
-    const { data: existingNominee } = await supabase
-      .from('nominees')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existingNominee) {
-      return res.status(404).json({ error: 'Nominee not found' });
-    }
-
-    const { error } = await supabase
-      .from('nominees')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Delete nominee error:', error);
-    res.status(500).json({ error: 'Failed to delete nominee' });
-  }
-});
-
-// Trading Accounts routes
-app.get('/api/dashboard/trading-accounts', authenticateDemoToken, async (req, res) => {
-  try {
-    const userId = req.user.sub;
+    const userId = req.user.id;
     const { data: tradingAccounts, error } = await supabase
       .from('trading_accounts')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch trading accounts' });
+    }
+
     res.json(tradingAccounts || []);
   } catch (error) {
-    console.error('Get trading accounts error:', error);
-    res.status(500).json({ error: 'Failed to get trading accounts' });
+    console.error('Dashboard trading accounts error:', error);
+    res.status(500).json({ error: 'Failed to fetch trading accounts' });
   }
 });
 
-app.post('/api/trading-accounts', authenticateDemoToken, async (req, res) => {
+// Assets endpoints
+app.get('/api/assets', demoTokenMiddleware, async (req, res) => {
   try {
-    const userId = req.user.sub;
-    const { brokerName, clientId, dematNumber, nomineeId, currentValue, status, notes } = req.body;
+    const userId = req.user.id;
+    const { data: assets, error } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    // Validate input data
-    const validationErrors = validateTradingAccountData({
-      brokerName,
-      clientId,
-      dematNumber,
-      currentValue
-    });
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      });
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch assets' });
     }
+
+    res.json(assets || []);
+  } catch (error) {
+    console.error('Assets fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch assets' });
+  }
+});
+
+app.post('/api/assets', demoTokenMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { category, institution, accountNumber, currentValue, status, notes, documents } = req.body;
+
+    const { data: asset, error } = await supabase
+      .from('assets')
+      .insert({
+        user_id: userId,
+        category,
+        institution,
+        account_number: accountNumber,
+        current_value: currentValue,
+        status: status || 'Active',
+        notes: notes || '',
+        documents: documents || []
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to create asset' });
+    }
+
+    res.json(asset);
+  } catch (error) {
+    console.error('Asset creation error:', error);
+    res.status(500).json({ error: 'Failed to create asset' });
+  }
+});
+
+app.put('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { category, institution, accountNumber, currentValue, status, notes, documents } = req.body;
+
+    const { data: asset, error } = await supabase
+      .from('assets')
+      .update({
+        category,
+        institution,
+        account_number: accountNumber,
+        current_value: currentValue,
+        status,
+        notes,
+        documents
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update asset' });
+    }
+
+    res.json(asset);
+  } catch (error) {
+    console.error('Asset update error:', error);
+    res.status(500).json({ error: 'Failed to update asset' });
+  }
+});
+
+app.delete('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const { error } = await supabase
+      .from('assets')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to delete asset' });
+    }
+
+    res.json({ success: true, message: 'Asset deleted successfully' });
+  } catch (error) {
+    console.error('Asset deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete asset' });
+  }
+});
+
+// Nominees endpoints
+app.get('/api/nominees', demoTokenMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { data: nominees, error } = await supabase
+      .from('nominees')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch nominees' });
+    }
+
+    res.json(nominees || []);
+  } catch (error) {
+    console.error('Nominees fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch nominees' });
+  }
+});
+
+app.post('/api/nominees', demoTokenMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, relation, phone, email, allocationPercentage, isExecutor, isBackup } = req.body;
+
+    const { data: nominee, error } = await supabase
+      .from('nominees')
+      .insert({
+        user_id: userId,
+        name,
+        relation,
+        phone,
+        email,
+        allocation_percentage: allocationPercentage,
+        is_executor: isExecutor || false,
+        is_backup: isBackup || false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to create nominee' });
+    }
+
+    res.json(nominee);
+  } catch (error) {
+    console.error('Nominee creation error:', error);
+    res.status(500).json({ error: 'Failed to create nominee' });
+  }
+});
+
+app.put('/api/nominees/:id', demoTokenMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { name, relation, phone, email, allocationPercentage, isExecutor, isBackup } = req.body;
+
+    const { data: nominee, error } = await supabase
+      .from('nominees')
+      .update({
+        name,
+        relation,
+        phone,
+        email,
+        allocation_percentage: allocationPercentage,
+        is_executor: isExecutor,
+        is_backup: isBackup
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update nominee' });
+    }
+
+    res.json(nominee);
+  } catch (error) {
+    console.error('Nominee update error:', error);
+    res.status(500).json({ error: 'Failed to update nominee' });
+  }
+});
+
+app.delete('/api/nominees/:id', demoTokenMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const { error } = await supabase
+      .from('nominees')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to delete nominee' });
+    }
+
+    res.json({ success: true, message: 'Nominee deleted successfully' });
+  } catch (error) {
+    console.error('Nominee deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete nominee' });
+  }
+});
+
+// Trading Accounts endpoints
+app.get('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { data: tradingAccounts, error } = await supabase
+      .from('trading_accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch trading accounts' });
+    }
+
+    res.json(tradingAccounts || []);
+  } catch (error) {
+    console.error('Trading accounts fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch trading accounts' });
+  }
+});
+
+app.post('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { platform, accountNumber, currentValue, status, notes } = req.body;
 
     const { data: tradingAccount, error } = await supabase
       .from('trading_accounts')
       .insert({
         user_id: userId,
-        broker_name: brokerName,
-        client_id: clientId,
-        demat_number: dematNumber,
-        nominee_id: nomineeId,
-        current_value: parseFloat(currentValue),
+        platform,
+        account_number: accountNumber,
+        current_value: currentValue,
         status: status || 'Active',
-        notes,
+        notes: notes || ''
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to create trading account' });
+    }
+
     res.json(tradingAccount);
   } catch (error) {
-    console.error('Create trading account error:', error);
+    console.error('Trading account creation error:', error);
     res.status(500).json({ error: 'Failed to create trading account' });
   }
 });
 
-app.put('/api/trading-accounts/:id', authenticateDemoToken, async (req, res) => {
+app.put('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.sub;
-    const { brokerName, clientId, dematNumber, nomineeId, currentValue, status, notes } = req.body;
-
-    // Validate input data
-    const validationErrors = validateTradingAccountData({
-      brokerName,
-      clientId,
-      dematNumber,
-      currentValue
-    });
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      });
-    }
-
-    // First check if trading account belongs to user
-    const { data: existingTradingAccount } = await supabase
-      .from('trading_accounts')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existingTradingAccount) {
-      return res.status(404).json({ error: 'Trading account not found' });
-    }
+    const userId = req.user.id;
+    const { platform, accountNumber, currentValue, status, notes } = req.body;
 
     const { data: tradingAccount, error } = await supabase
       .from('trading_accounts')
       .update({
-        broker_name: brokerName,
-        client_id: clientId,
-        demat_number: dematNumber,
-        nominee_id: nomineeId,
-        current_value: parseFloat(currentValue),
-        status: status || 'Active',
-        notes,
+        platform,
+        account_number: accountNumber,
+        current_value: currentValue,
+        status,
+        notes
       })
       .eq('id', id)
+      .eq('user_id', userId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update trading account' });
+    }
+
     res.json(tradingAccount);
   } catch (error) {
-    console.error('Update trading account error:', error);
+    console.error('Trading account update error:', error);
     res.status(500).json({ error: 'Failed to update trading account' });
   }
 });
 
-app.delete('/api/trading-accounts/:id', authenticateDemoToken, async (req, res) => {
+app.delete('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.sub;
-
-    // First check if trading account belongs to user
-    const { data: existingTradingAccount } = await supabase
-      .from('trading_accounts')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existingTradingAccount) {
-      return res.status(404).json({ error: 'Trading account not found' });
-    }
+    const userId = req.user.id;
 
     const { error } = await supabase
       .from('trading_accounts')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
 
-    if (error) throw error;
-    res.json({ success: true });
+    if (error) {
+      return res.status(500).json({ error: 'Failed to delete trading account' });
+    }
+
+    res.json({ success: true, message: 'Trading account deleted successfully' });
   } catch (error) {
-    console.error('Delete trading account error:', error);
+    console.error('Trading account deletion error:', error);
     res.status(500).json({ error: 'Failed to delete trading account' });
   }
 });
 
-// Vault Requests routes
-app.get('/api/vault-requests', authenticateDemoToken, async (req, res) => {
+// Vault endpoints
+app.get('/api/vault/requests', demoTokenMiddleware, async (req, res) => {
   try {
+    const userId = req.user.id;
     const { data: vaultRequests, error } = await supabase
       .from('vault_requests')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch vault requests' });
+    }
+
     res.json(vaultRequests || []);
   } catch (error) {
-    console.error('Get vault requests error:', error);
-    res.status(500).json({ error: 'Failed to get vault requests' });
+    console.error('Vault requests fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch vault requests' });
   }
 });
 
-app.post('/api/vault-requests', async (req, res) => {
+app.post('/api/vault/requests', demoTokenMiddleware, async (req, res) => {
   try {
+    const userId = req.user.id;
     const { nomineeId, nomineeName, relationToDeceased, phoneNumber, email, deathCertificateUrl } = req.body;
 
     const { data: vaultRequest, error } = await supabase
       .from('vault_requests')
       .insert({
+        user_id: userId,
         nominee_id: nomineeId,
         nominee_name: nomineeName,
         relation_to_deceased: relationToDeceased,
         phone_number: phoneNumber,
         email,
         death_certificate_url: deathCertificateUrl,
-        status: 'pending',
+        status: 'pending'
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to create vault request' });
+    }
+
     res.json(vaultRequest);
   } catch (error) {
-    console.error('Create vault request error:', error);
+    console.error('Vault request creation error:', error);
     res.status(500).json({ error: 'Failed to create vault request' });
   }
 });
 
-app.put('/api/vault-requests/:id', authenticateDemoToken, async (req, res) => {
+app.put('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
     const { nomineeId, nomineeName, relationToDeceased, phoneNumber, email, deathCertificateUrl, status } = req.body;
 
     const { data: vaultRequest, error } = await supabase
@@ -874,217 +779,54 @@ app.put('/api/vault-requests/:id', authenticateDemoToken, async (req, res) => {
         phone_number: phoneNumber,
         email,
         death_certificate_url: deathCertificateUrl,
-        status: status || 'pending',
+        status
       })
       .eq('id', id)
+      .eq('user_id', userId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update vault request' });
+    }
+
     res.json(vaultRequest);
   } catch (error) {
-    console.error('Update vault request error:', error);
+    console.error('Vault request update error:', error);
     res.status(500).json({ error: 'Failed to update vault request' });
   }
 });
 
-app.delete('/api/vault-requests/:id', authenticateDemoToken, async (req, res) => {
+app.delete('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
 
     const { error } = await supabase
       .from('vault_requests')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
 
-    if (error) throw error;
-    res.json({ success: true });
+    if (error) {
+      return res.status(500).json({ error: 'Failed to delete vault request' });
+    }
+
+    res.json({ success: true, message: 'Vault request deleted successfully' });
   } catch (error) {
-    console.error('Delete vault request error:', error);
+    console.error('Vault request deletion error:', error);
     res.status(500).json({ error: 'Failed to delete vault request' });
   }
 });
 
-// User Profile routes
-app.get('/api/user/profile', authenticateDemoToken, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, name, phone, email, address, role, is_active, created_at, updated_at')
-      .eq('id', userId)
-      .single();
-
-    if (error) throw error;
-    res.json(user);
-  } catch (error) {
-    console.error('Get user profile error:', error);
-    res.status(500).json({ error: 'Failed to get user profile' });
-  }
-});
-
-app.put('/api/user/profile', authenticateDemoToken, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const { name, email, address } = req.body;
-
-    // Validate input
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ error: 'Name is required' });
-    }
-
-    if (!email || !validateEmail(email)) {
-      return res.status(400).json({ error: 'Valid email is required' });
-    }
-
-    const { data: user, error } = await supabase
-      .from('users')
-      .update({
-        name: name.trim(),
-        email: email.trim(),
-        address: address?.trim() || null,
-      })
-      .eq('id', userId)
-      .select('id, name, phone, email, address, role, is_active, created_at, updated_at')
-      .single();
-
-    if (error) throw error;
-    res.json(user);
-  } catch (error) {
-    console.error('Update user profile error:', error);
-    res.status(500).json({ error: 'Failed to update user profile' });
-  }
-});
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Unhandled error:', error);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 LifeVault Backend running on http://localhost:${PORT}`);
-  console.log(`📊 Supabase connected: ${process.env.SUPABASE_URL}`);
-  console.log(`🔐 JWT Secret configured: ${process.env.JWT_SECRET ? 'Yes' : 'No'}`);
-  console.log(`📱 Demo token authentication enabled`);
-  console.log(`✅ Input validation enabled`);
-  console.log(`🔄 Full CRUD operations available`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`CORS enabled for origins: ${JSON.stringify([
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3003",
+    "https://life-vault-frontend-y0a5.onrender.com",
+    "https://life-vault-frontend.onrender.com"
+  ])}`);
 });
-
-// Optimized batched dashboard endpoint
-app.get('/api/dashboard/batch', authenticateDemoToken, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    console.log('Fetching batched dashboard data for user:', userId);
-
-    // Execute all queries in parallel for maximum performance
-    const [
-      assetsResult,
-      nomineesResult,
-      tradingAccountsResult
-    ] = await Promise.allSettled([
-      supabase
-        .from('assets')
-        .select('id, category, current_value, status, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('nominees')
-        .select('id, name, relation, allocation_percentage, is_executor, is_backup')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('trading_accounts')
-        .select('id, broker_name, account_number, current_value, status, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-    ]);
-
-    // Extract data from results
-    const assets = assetsResult.status === 'fulfilled' ? assetsResult.value.data || [] : [];
-    const nominees = nomineesResult.status === 'fulfilled' ? nomineesResult.value.data || [] : [];
-    const tradingAccounts = tradingAccountsResult.status === 'fulfilled' ? tradingAccountsResult.value.data || [] : [];
-
-    // Calculate totals
-    const totalAssets = assets.length;
-    const totalNominees = nominees.length;
-    const totalTradingAccounts = tradingAccounts.length;
-    const totalValue = assets.reduce((sum, asset) => sum + parseFloat(asset.current_value || 0), 0);
-
-    // Prepare asset allocation data with colors
-    const colors = ['#1E3A8A', '#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE', '#EFF6FF', '#A78BFA'];
-    
-    const assetAllocation = [
-      ...assets.map((asset, index) => ({
-        name: asset.category,
-        value: parseFloat(asset.current_value || 0),
-        amount: parseFloat(asset.current_value || 0),
-        color: colors[index % colors.length]
-      })),
-      ...tradingAccounts.map((account, index) => ({
-        name: `Trading Account (${account.broker_name})`,
-        value: parseFloat(account.current_value || 0),
-        amount: parseFloat(account.current_value || 0),
-        color: colors[(assets.length + index) % colors.length]
-      }))
-    ];
-
-    // Prepare recent activity (simplified for performance)
-    const recentActivity = [
-      ...assets.slice(0, 3).map(asset => ({
-        id: `asset_${asset.id}`,
-        type: 'asset_added',
-        description: `Added ${asset.category} - ${asset.institution || 'Account'}`,
-        timestamp: new Date(asset.created_at),
-        status: 'success'
-      })),
-      ...nominees.slice(0, 2).map(nominee => ({
-        id: `nominee_${nominee.id}`,
-        type: 'nominee_updated',
-        description: `Updated ${nominee.name} (${nominee.relation})`,
-        timestamp: new Date(),
-        status: 'info'
-      }))
-    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
-
-    const response = {
-      totalAssets,
-      totalNominees,
-      totalTradingAccounts,
-      totalValue,
-      netWorth: totalValue,
-      assetAllocation,
-      recentActivity,
-      // Include raw data for other components
-      assets: assets.map(asset => ({
-        ...asset,
-        institution: asset.institution || 'N/A',
-        account_number: asset.account_number || 'N/A',
-        notes: asset.notes || '',
-        documents: asset.documents || []
-      })),
-      nominees: nominees.map(nominee => ({
-        ...nominee,
-        phone: nominee.phone || '',
-        email: nominee.email || '',
-        allocationPercentage: nominee.allocation_percentage,
-        isExecutor: nominee.is_executor,
-        isBackup: nominee.is_backup
-      })),
-      tradingAccounts: tradingAccounts.map(account => ({
-        ...account,
-        accountNumber: account.account_number,
-        currentValue: account.current_value,
-        brokerName: account.broker_name
-      }))
-    };
-
-    console.log('Batched dashboard data prepared successfully');
-    res.json(response);
-  } catch (error) {
-    console.error('Batched dashboard error:', error);
-    res.status(500).json({ error: 'Failed to get dashboard data' });
-  }
-});
-
