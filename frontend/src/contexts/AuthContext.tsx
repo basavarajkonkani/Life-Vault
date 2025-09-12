@@ -75,19 +75,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const initializeAuth = async () => {
       try {
+        console.log('Initializing auth...');
+        
+        // Clear any existing localStorage data
+        localStorage.removeItem('lifevault_user');
+        localStorage.removeItem('lifevault_session');
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+          }
+          return;
         }
+
+        console.log('Session check result:', { session: !!session, user: !!session?.user });
 
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
           
           if (session?.user) {
+            console.log('User found, fetching profile...');
             const profile = await fetchUserProfile(session.user.id);
             setUserProfile(profile);
+            console.log('Profile fetched:', { profile: !!profile });
+          } else {
+            setUserProfile(null);
           }
           
           setLoading(false);
@@ -95,6 +114,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
+          setSession(null);
+          setUser(null);
+          setUserProfile(null);
           setLoading(false);
         }
       }
@@ -106,6 +128,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', { event, session: !!session, user: !!session?.user });
+      
       if (mounted) {
         setSession(session);
         setUser(session?.user ?? null);
@@ -129,18 +153,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting sign in with email:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
+      if (error) {
+        console.error('Sign in error:', error);
+      } else {
+        console.log('Sign in successful');
+      }
+      
       return { error };
     } catch (error) {
+      console.error('Sign in exception:', error);
       return { error: error as AuthError };
     }
   };
 
   const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
     try {
+      console.log('Attempting sign up with email:', email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -155,6 +189,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       if (error) {
+        console.error('Sign up error:', error);
         return { error };
       }
 
@@ -174,59 +209,105 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
+        } else {
+          console.log('User profile created successfully');
         }
       }
 
       return { error: null };
     } catch (error) {
+      console.error('Sign up exception:', error);
       return { error: error as AuthError };
     }
   };
 
   const signInWithOtp = async (phone: string) => {
     try {
+      console.log('Attempting OTP sign in with phone:', phone);
       const { error } = await supabase.auth.signInWithOtp({
         phone,
         options: {
           channel: 'sms'
         }
       });
+      
+      if (error) {
+        console.error('OTP sign in error:', error);
+      } else {
+        console.log('OTP sent successfully');
+      }
+      
       return { error };
     } catch (error) {
+      console.error('OTP sign in exception:', error);
       return { error: error as AuthError };
     }
   };
 
   const verifyOtp = async (phone: string, token: string) => {
     try {
+      console.log('Attempting OTP verification for phone:', phone);
       const { error } = await supabase.auth.verifyOtp({
         phone,
         token,
         type: 'sms'
       });
+      
+      if (error) {
+        console.error('OTP verification error:', error);
+      } else {
+        console.log('OTP verification successful');
+      }
+      
       return { error };
     } catch (error) {
+      console.error('OTP verification exception:', error);
       return { error: error as AuthError };
     }
   };
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      console.log('Signing out...');
+      
+      // Clear local state first
       setUser(null);
       setUserProfile(null);
       setSession(null);
+      
+      // Clear localStorage
+      localStorage.removeItem('lifevault_user');
+      localStorage.removeItem('lifevault_session');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+      } else {
+        console.log('Sign out successful');
+      }
+      
+      // Force redirect to login page
+      window.location.href = '/login';
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('Sign out exception:', error);
+      // Force redirect even if there's an error
+      window.location.href = '/login';
     }
   };
 
   const refreshSession = async () => {
     try {
+      console.log('Refreshing session...');
       const { data, error } = await supabase.auth.refreshSession();
+      
       if (error) {
         console.error('Error refreshing session:', error);
+      } else {
+        console.log('Session refreshed successfully');
       }
+      
       return data;
     } catch (error) {
       console.error('Error refreshing session:', error);
@@ -245,6 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .eq('id', user.id);
 
       if (error) {
+        console.error('Profile update error:', error);
         return { error: { message: error.message } as AuthError };
       }
 
@@ -253,8 +335,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUserProfile({ ...userProfile, ...updates });
       }
 
+      console.log('Profile updated successfully');
       return { error: null };
     } catch (error) {
+      console.error('Profile update exception:', error);
       return { error: error as AuthError };
     }
   };

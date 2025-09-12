@@ -97,13 +97,46 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Demo token middleware (for testing)
-const demoTokenMiddleware = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+// Real Supabase authentication middleware
+const authenticateToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (token === 'demo-token') {
-    req.user = { id: '550e8400-e29b-41d4-a716-446655440000', role: 'owner' };
+    if (!token) {
+      return res.status(401).json({ error: 'Access token required' });
+    }
+
+    // Verify JWT token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+
+    // Get user profile from database
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      return res.status(403).json({ error: 'User profile not found' });
+    }
+
+    req.user = {
+      id: user.id,
+      email: user.email,
+      role: userProfile.role
+    };
+
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    return res.status(500).json({ error: 'Authentication failed' });
+  }
+};
     return next();
   }
 
@@ -250,7 +283,7 @@ app.post('/api/auth/verify-pin', async (req, res) => {
 });
 
 // Dashboard endpoints
-app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
+app.get('/api/dashboard/stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -392,7 +425,7 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/batch', demoTokenMiddleware, async (req, res) => {
+app.get('/api/dashboard/batch', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     console.log('Fetching real data for user:', userId);
@@ -471,7 +504,7 @@ app.get('/api/dashboard/batch', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/assets', demoTokenMiddleware, async (req, res) => {
+app.get('/api/dashboard/assets', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: assets, error } = await supabase
@@ -491,7 +524,7 @@ app.get('/api/dashboard/assets', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/nominees', demoTokenMiddleware, async (req, res) => {
+app.get('/api/dashboard/nominees', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: nominees, error } = await supabase
@@ -511,7 +544,7 @@ app.get('/api/dashboard/nominees', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/dashboard/trading-accounts', demoTokenMiddleware, async (req, res) => {
+app.get('/api/dashboard/trading-accounts', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: tradingAccounts, error } = await supabase
@@ -532,7 +565,7 @@ app.get('/api/dashboard/trading-accounts', demoTokenMiddleware, async (req, res)
 });
 
 // Assets endpoints
-app.get('/api/assets', demoTokenMiddleware, async (req, res) => {
+app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: assets, error } = await supabase
@@ -552,7 +585,7 @@ app.get('/api/assets', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/assets', demoTokenMiddleware, async (req, res) => {
+app.post('/api/assets', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { category, institution, accountNumber, currentValue, status, notes, documents } = req.body;
@@ -583,7 +616,7 @@ app.post('/api/assets', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
+app.put('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -616,7 +649,7 @@ app.put('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
+app.delete('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -639,7 +672,7 @@ app.delete('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
 });
 
 // Nominees endpoints
-app.get('/api/nominees', demoTokenMiddleware, async (req, res) => {
+app.get('/api/nominees', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: nominees, error } = await supabase
@@ -659,7 +692,7 @@ app.get('/api/nominees', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/nominees', demoTokenMiddleware, async (req, res) => {
+app.post('/api/nominees', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { name, relation, phone, email, allocationPercentage, isExecutor, isBackup } = req.body;
@@ -690,7 +723,7 @@ app.post('/api/nominees', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/nominees/:id', demoTokenMiddleware, async (req, res) => {
+app.put('/api/nominees/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -723,7 +756,7 @@ app.put('/api/nominees/:id', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/nominees/:id', demoTokenMiddleware, async (req, res) => {
+app.delete('/api/nominees/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -746,7 +779,7 @@ app.delete('/api/nominees/:id', demoTokenMiddleware, async (req, res) => {
 });
 
 // Trading Accounts endpoints
-app.get('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
+app.get('/api/trading-accounts', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: tradingAccounts, error } = await supabase
@@ -766,7 +799,7 @@ app.get('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
+app.post('/api/trading-accounts', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { broker_name, accountNumber, currentValue, status, notes } = req.body;
@@ -795,7 +828,7 @@ app.post('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) => {
+app.put('/api/trading-accounts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -826,7 +859,7 @@ app.put('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) => {
+app.delete('/api/trading-accounts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -849,7 +882,7 @@ app.delete('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) =>
 });
 
 // Vault endpoints
-app.get('/api/vault/requests', demoTokenMiddleware, async (req, res) => {
+app.get('/api/vault/requests', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { data: vaultRequests, error } = await supabase
@@ -869,7 +902,7 @@ app.get('/api/vault/requests', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/vault/requests', demoTokenMiddleware, async (req, res) => {
+app.post('/api/vault/requests', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { nomineeId, nomineeName, relationToDeceased, phoneNumber, email, deathCertificateUrl } = req.body;
@@ -900,7 +933,7 @@ app.post('/api/vault/requests', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
+app.put('/api/vault/requests/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -933,7 +966,7 @@ app.put('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
+app.delete('/api/vault/requests/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
@@ -1097,7 +1130,7 @@ const initializeDemoData = async () => {
 
 
 // Test endpoint to manually create demo data
-app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => {
+app.post('/api/test/create-demo-data', authenticateToken, async (req, res) => {
   try {
     const demoUserId = '550e8400-e29b-41d4-a716-446655440000';
     
@@ -1235,7 +1268,7 @@ app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => 
 
 
 // Test endpoint to return demo data
-app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
+app.get('/api/test/demo-data', authenticateToken, async (req, res) => {
   try {
     const demoData = {
       totalAssets: 4,

@@ -1,4 +1,5 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
+import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -14,37 +15,27 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      // For demo purposes, always use demo token
-      // In production, this would get the token from your auth system
-      config.headers.Authorization = `Bearer demo-token`;
+      // Get the current session from Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+      } else {
+        // If no session, redirect to login
+        window.location.href = '/login';
+        return Promise.reject(new Error('No valid session'));
+      }
     } catch (error) {
       console.error('Error setting auth token:', error);
+      window.location.href = '/login';
+      return Promise.reject(error);
     }
-    
     return config;
   },
   (error) => {
     return Promise.reject(error);
   }
 );
-
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Redirect to login
-      window.location.href = '/login';
-    }
-    
-    // Enhanced error logging
-    console.error('API Error:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      method: error.config?.method
-    });
     
     return Promise.reject(error);
   }

@@ -71,6 +71,24 @@ const getNavigationItems = (userRole: string) => {
   return roleSpecificItems[userRole as keyof typeof roleSpecificItems] || baseItems;
 };
 
+// Login page component that redirects if already authenticated
+const LoginPage = memo(() => {
+  const { user, userProfile, loading } = useAuth();
+
+  // Show loading while checking authentication
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  // If already authenticated, redirect to dashboard
+  if (user && userProfile) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Show login page
+  return <Login />;
+});
+
 // Main app component with proper routing
 const MainApp = memo(() => {
   const { user, userProfile, loading } = useAuth();
@@ -101,74 +119,11 @@ const AuthenticatedApp = memo(() => {
 
   return (
     <ResponsiveLayout user={userProfile} onLogout={signOut} navigationItems={navigationItems}>
-      <Routes>
-        <Route 
-          path="/" 
-          element={
-            userProfile?.role === "owner" ? <OwnerDashboard /> :
-            userProfile?.role === "nominee" ? <NomineeDashboard /> :
-            userProfile?.role === "admin" ? <AdminDashboard /> :
-            <OwnerDashboard />
-          } 
-        />
-        <Route 
-          path="/assets" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Assets />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/nominees" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Nominees />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/vault" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "nominee", "admin"]}>
-              <Vault />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/trading-accounts" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <TradingAccounts />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/claim-guides" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "nominee", "admin"]}>
-              <ClaimGuides />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/reports" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Reports />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/settings" 
-          element={
-            <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Settings />
-            </ProtectedRoute>
-          } 
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+                      <Routes>
+                  <Route path="/" element={<Navigate to="/login" replace />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/*" element={<MainApp />} />
+                </Routes>
     </ResponsiveLayout>
   );
 });
@@ -183,7 +138,7 @@ const AppContent = memo(() => {
             <Suspense fallback={<LoadingSpinner />}>
               <Router>
                 <Routes>
-                  <Route path="/login" element={<Login />} />
+                  <Route path="/login" element={<LoginPage />} />
                   <Route path="/*" element={<MainApp />} />
                 </Routes>
               </Router>
