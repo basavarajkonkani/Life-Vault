@@ -1334,6 +1334,12 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
   }
 });
 
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Test endpoint working!', timestamp: new Date().toISOString() });
+});
+
 // Start server
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
