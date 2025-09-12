@@ -1,5 +1,4 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
-import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -8,21 +7,18 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30 second timeout for Render cold starts
 });
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
     try {
-      // Get the current session from Supabase
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.access_token) {
-        config.headers.Authorization = `Bearer ${session.access_token}`;
-      }
+      // For demo purposes, always use demo token
+      // In production, this would get the token from your auth system
+      config.headers.Authorization = `Bearer demo-token`;
     } catch (error) {
-      console.error('Error getting session for API request:', error);
+      console.error('Error setting auth token:', error);
     }
     
     return config;
@@ -37,8 +33,7 @@ api.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid, sign out user
-      await supabase.auth.signOut();
+      // Redirect to login
       window.location.href = '/login';
     }
     
@@ -117,14 +112,14 @@ export const authAPI = {
   },
 };
 
-// Dashboard API with enhanced error handling
+// Dashboard API
 export const dashboardAPI = {
   getStats: async () => {
     try {
       const response = await api.get('/api/dashboard/stats');
       return response.data;
     } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to fetch dashboard statistics'));
+      throw new Error(handleApiError(error, 'Failed to fetch dashboard stats'));
     }
   },
 
@@ -133,7 +128,7 @@ export const dashboardAPI = {
       const response = await api.get('/api/dashboard/batch');
       return response.data;
     } catch (error) {
-      throw new Error(handleApiError(error, 'Failed to fetch dashboard data'));
+      throw new Error(handleApiError(error, 'Failed to fetch batch data'));
     }
   },
 
