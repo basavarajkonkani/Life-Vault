@@ -11,6 +11,20 @@
   ],
   "routes": [
     {
+      "src": "/static/css/(.*)",
+      "dest": "/static/css/$1",
+      "headers": {
+        "Content-Type": "text/css"
+      }
+    },
+    {
+      "src": "/static/js/(.*)",
+      "dest": "/static/js/$1",
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
       "src": "/static/(.*)",
       "dest": "/static/$1"
     },
@@ -20,6 +34,6 @@
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "https://life-vault-backend.onrender.com"
+    "REACT_APP_API_URL": "https://life-vault-backend.onrender.com/api"
   }
 }
