@@ -820,10 +820,31 @@ app.delete('/api/vault/requests/:id', demoTokenMiddleware, async (req, res) => {
 });
 
 
+
 // Initialize demo data
 const initializeDemoData = async () => {
   try {
     const demoUserId = '550e8400-e29b-41d4-a716-446655440000';
+    
+    // First, create the demo user if it doesn't exist
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', demoUserId)
+      .single();
+
+    if (!existingUser) {
+      await supabase.from('users').insert({
+        id: demoUserId,
+        name: 'Demo User',
+        email: 'demo@lifevault.com',
+        phone: '+91 9876543210',
+        address: '123 Demo Street, Demo City',
+        role: 'owner',
+        is_active: true
+      });
+      console.log('Demo user created');
+    }
     
     // Check if demo data already exists
     const { data: existingAssets } = await supabase
@@ -935,6 +956,8 @@ const initializeDemoData = async () => {
     console.error('❌ Demo data initialization error:', error);
   }
 };
+
+
 
 // Start server
 app.listen(PORT, async () => {
