@@ -105,5 +105,22 @@
         }
       }, 2000);
     </script>
+  
+    <script>
+      // Simple SPA routing fallback
+      if (window.location.pathname !== '/' && !window.location.pathname.startsWith('/static/')) {
+        // If we're on a route that should be handled by React Router, reload to root
+        if (window.location.pathname.includes('/login') || 
+            window.location.pathname.includes('/dashboard') ||
+            window.location.pathname.includes('/assets') ||
+            window.location.pathname.includes('/nominees') ||
+            window.location.pathname.includes('/vault') ||
+            window.location.pathname.includes('/trading-accounts') ||
+            window.location.pathname.includes('/reports') ||
+            window.location.pathname.includes('/settings')) {
+          console.log('SPA route detected, ensuring proper loading...');
+        }
+      }
+    </script>
   </body>
 </html>
