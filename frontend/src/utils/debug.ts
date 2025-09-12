@@ -25,23 +25,10 @@ export const clearAuth = () => {
   window.location.reload();
 };
 
+// DISABLED: Demo user creation removed for production
 export const createDemoUser = () => {
-  const demoUser = {
-    id: '550e8400-e29b-41d4-a716-446655440000',
-    name: 'Demo User',
-    phone: '+91 9876543210',
-    email: 'demo@lifevault.com',
-    address: '123 Demo Street, Demo City',
-    role: 'owner',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-  localStorage.setItem('user', JSON.stringify(demoUser));
-  localStorage.setItem('authToken', 'demo-token');
-  console.log('Demo user created:', demoUser);
-  window.location.reload();
-  return demoUser;
+  console.warn('Demo user creation is disabled in production');
+  return null;
 };
 
 // Make debug functions available globally in development
@@ -53,5 +40,5 @@ if (process.env.NODE_ENV === 'development') {
   console.log('🔧 Debug utilities available:');
   console.log('- debugAuth() - Check authentication state');
   console.log('- clearAuth() - Clear authentication and reload');
-  console.log('- createDemoUser() - Create demo user and reload');
+  console.log('- createDemoUser() - DISABLED in production');
 }

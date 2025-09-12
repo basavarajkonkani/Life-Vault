@@ -140,7 +140,7 @@ const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
               <User className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.name || 'Demo User'}</p>
+              <p className="text-sm font-medium truncate">{user?.name || 'User'}</p>
               <p className="text-xs text-primary-200 truncate">
                 {user?.role === 'owner' ? 'Asset Owner' : 
                  user?.role === 'nominee' ? 'Nominee' : 

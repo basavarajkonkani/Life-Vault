@@ -10,7 +10,7 @@ const Settings: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: 'Demo User',
+    name: '',
     email: 'demo@lifevault.com',
     phone: '+91 9876543210',
     role: 'Owner'

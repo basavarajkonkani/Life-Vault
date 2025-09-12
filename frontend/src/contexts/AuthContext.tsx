@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Initialize auth state
+    // Initialize auth state
   useEffect(() => {
     let mounted = true;
 
@@ -77,9 +77,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('Initializing auth...');
         
-        // Clear any existing localStorage data
+        // Clear any existing localStorage data aggressively
         localStorage.removeItem('lifevault_user');
         localStorage.removeItem('lifevault_session');
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('supabase.auth.token');
         
         const { data: { session }, error } = await supabase.auth.getSession();
         
