@@ -125,7 +125,7 @@ export const dashboardAPI = {
 
   getBatchData: async () => {
     try {
-      const response = await api.get('/api/test/demo-data');
+      const response = await api.get('/api/dashboard/batch');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error, 'Failed to fetch batch data'));
