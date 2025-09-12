@@ -1,4 +1,10 @@
-import React, { Suspense, useState, useEffect, useMemo, memo } from 'react';
+const fs = require('fs');
+
+// Add performance optimizations to the dashboard
+let content = fs.readFileSync('src/pages/Dashboard.tsx', 'utf8');
+
+// Add React.memo and useMemo optimizations
+const optimizedContent = `import React, { Suspense, useState, useEffect, useMemo, memo } from 'react';
 import { Plus, Users, Lock, TrendingUp, Eye, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardStats } from '../hooks/queries/useDashboardStats';
@@ -209,12 +215,12 @@ const Dashboard: React.FC = () => {
                       dataKey="value"
                     >
                       {stats.assetAllocation.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell key={`cell-\${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: number) => [`${value.toFixed(1)}%`, 'Allocation']}
-                      labelFormatter={(label) => `${label}`}
+                      formatter={(value: number) => [`\${value.toFixed(1)}%`, 'Allocation']}
+                      labelFormatter={(label) => `\${label}`}
                     />
                     <Legend />
                   </PieChart>
@@ -258,4 +264,7 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard;`;
+
+fs.writeFileSync('src/pages/Dashboard.tsx', optimizedContent);
+console.log('✅ Dashboard performance optimizations added');

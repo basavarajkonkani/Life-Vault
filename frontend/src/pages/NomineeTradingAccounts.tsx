@@ -7,9 +7,9 @@ import { useNotification } from '../contexts/NotificationContext';
 import TradingAccountSkeleton from '../components/skeletons/TradingAccountSkeleton';
 
 interface TradingAccountFormData {
-  brokerName: string;
-  clientId: string;
-  dematNumber: string;
+  platform: string;
+  accountNumber: string;
+  accountNumber: string;
   nomineeId: string;
   currentValue: string;
   status: 'Active' | 'Inactive';
@@ -39,9 +39,9 @@ const NomineeTradingAccounts: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<any>(null);
 
   const [formData, setFormData] = useState<TradingAccountFormData>({
-    brokerName: '',
-    clientId: '',
-    dematNumber: '',
+    platform: '',
+    accountNumber: '',
+    accountNumber: '',
     nomineeId: '',
     currentValue: '',
     status: 'Active',
@@ -67,9 +67,9 @@ const NomineeTradingAccounts: React.FC = () => {
     
     try {
       const accountData = {
-        platform: formData.brokerName, // Map brokerName to platform
-        accountNumber: formData.clientId, // Map clientId to accountNumber
-        dematNumber: formData.dematNumber,
+        platform: formData.platform, // Map platform to platform
+        accountNumber: formData.accountNumber, // Map accountNumber to accountNumber
+        accountNumber: formData.accountNumber,
         nomineeId: formData.nomineeId || null,
         currentValue: parseFloat(formData.currentValue),
         status: formData.status,
@@ -88,9 +88,9 @@ const NomineeTradingAccounts: React.FC = () => {
 
       // Reset form and refresh data
       setFormData({
-        brokerName: '',
-        clientId: '',
-        dematNumber: '',
+        platform: '',
+        accountNumber: '',
+        accountNumber: '',
         nomineeId: '',
         currentValue: '',
         status: 'Active',
@@ -108,9 +108,9 @@ const NomineeTradingAccounts: React.FC = () => {
   const handleEdit = (account: any) => {
     setEditingAccount(account);
     setFormData({
-      brokerName: account.platform || '',
-      clientId: account.account_number || '',
-      dematNumber: account.account_number || '',
+      platform: account.platform || '',
+      accountNumber: account.account_number || '',
+      accountNumber: account.account_number || '',
       nomineeId: account.nominee_id || '',
       currentValue: account.current_value?.toString() || '',
       status: account.status || 'Active',
@@ -135,9 +135,9 @@ const NomineeTradingAccounts: React.FC = () => {
     setShowAddForm(false);
     setEditingAccount(null);
     setFormData({
-      brokerName: '',
-      clientId: '',
-      dematNumber: '',
+      platform: '',
+      accountNumber: '',
+      accountNumber: '',
       nomineeId: '',
       currentValue: '',
       status: 'Active',
@@ -215,8 +215,8 @@ const NomineeTradingAccounts: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  name="brokerName"
-                  value={formData.brokerName}
+                  name="platform"
+                  value={formData.platform}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -230,8 +230,8 @@ const NomineeTradingAccounts: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  name="clientId"
-                  value={formData.clientId}
+                  name="accountNumber"
+                  value={formData.accountNumber}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -245,8 +245,8 @@ const NomineeTradingAccounts: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  name="dematNumber"
-                  value={formData.dematNumber}
+                  name="accountNumber"
+                  value={formData.accountNumber}
                   onChange={handleInputChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"

@@ -276,7 +276,7 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
           user_id: userId,
           category: 'Bank',
           institution: 'State Bank of India',
-          account_number: '****1234',
+          client_id: '****1234',
           current_value: 500000,
           status: 'Active',
           notes: 'Primary savings account',
@@ -287,7 +287,7 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
           user_id: userId,
           category: 'Mutual Fund',
           institution: 'HDFC Mutual Fund',
-          account_number: 'MF001234',
+          client_id: 'MF001234',
           current_value: 300000,
           status: 'Active',
           notes: 'Equity growth fund',
@@ -298,7 +298,7 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
           user_id: userId,
           category: 'LIC Policy',
           institution: 'Life Insurance Corporation',
-          account_number: 'LIC123456',
+          client_id: 'LIC123456',
           current_value: 200000,
           status: 'Active',
           notes: 'Term life insurance policy',
@@ -309,7 +309,7 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
           user_id: userId,
           category: 'Fixed Deposit',
           institution: 'ICICI Bank',
-          account_number: 'FD789012',
+          client_id: 'FD789012',
           current_value: 150000,
           status: 'Active',
           notes: '5-year fixed deposit',
@@ -348,8 +348,8 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
         {
           id: 'demo-trading-1',
           user_id: userId,
-          platform: 'Zerodha',
-          account_number: 'ZR123456',
+          broker_name: 'Zerodha',
+          client_id: 'ZR123456',
           current_value: 250000,
           status: 'Active',
           notes: 'Primary trading account'
@@ -357,8 +357,8 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
         {
           id: 'demo-trading-2',
           user_id: userId,
-          platform: 'Upstox',
-          account_number: 'UP789012',
+          broker_name: 'Upstox',
+          client_id: 'UP789012',
           current_value: 100000,
           status: 'Active',
           notes: 'Secondary trading account'
@@ -395,28 +395,58 @@ app.get('/api/dashboard/stats', demoTokenMiddleware, async (req, res) => {
 app.get('/api/dashboard/batch', demoTokenMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('Fetching real data for user:', userId);
 
-    // Get all data in parallel
+    // Get all data from Supabase in parallel
     const [assetsResult, nomineesResult, tradingAccountsResult] = await Promise.all([
       supabase.from('assets').select('*').eq('user_id', userId),
       supabase.from('nominees').select('*').eq('user_id', userId),
       supabase.from('trading_accounts').select('*').eq('user_id', userId)
     ]);
 
-    const assets = [{"id":"demo-1","user_id":userId,"category":"Bank","institution":"State Bank of India","account_number":"****1234","current_value":500000,"status":"Active","notes":"Primary savings account","documents":[]},{"id":"demo-2","user_id":userId,"category":"Mutual Fund","institution":"HDFC Mutual Fund","account_number":"MF001234","current_value":300000,"status":"Active","notes":"Equity growth fund","documents":[]},{"id":"demo-3","user_id":userId,"category":"LIC Policy","institution":"Life Insurance Corporation","account_number":"LIC123456","current_value":200000,"status":"Active","notes":"Term life insurance policy","documents":[]},{"id":"demo-4","user_id":userId,"category":"Fixed Deposit","institution":"ICICI Bank","account_number":"FD789012","current_value":150000,"status":"Active","notes":"5-year fixed deposit","documents":[]}];
-    const nominees = [{"id":"demo-nominee-1","user_id":userId,"name":"Jane Doe","relation":"Spouse","phone":"+91 9876543211","email":"jane@example.com","allocation_percentage":60,"is_executor":true,"is_backup":false},{"id":"demo-nominee-2","user_id":userId,"name":"John Jr","relation":"Child","phone":"+91 9876543212","email":"john@example.com","allocation_percentage":40,"is_executor":false,"is_backup":false}];
-    const tradingAccounts = [{"id":"demo-trading-1","user_id":userId,"platform":"Zerodha","account_number":"ZR123456","current_value":250000,"status":"Active","notes":"Primary trading account"},{"id":"demo-trading-2","user_id":userId,"platform":"Upstox","account_number":"UP789012","current_value":100000,"status":"Active","notes":"Secondary trading account"}];
+    // Check for errors
+    if (assetsResult.error) {
+      console.error('Assets fetch error:', assetsResult.error);
+      return res.status(500).json({ error: 'Failed to fetch assets' });
+    }
+    if (nomineesResult.error) {
+      console.error('Nominees fetch error:', nomineesResult.error);
+      return res.status(500).json({ error: 'Failed to fetch nominees' });
+    }
+    if (tradingAccountsResult.error) {
+      console.error('Trading accounts fetch error:', tradingAccountsResult.error);
+      return res.status(500).json({ error: 'Failed to fetch trading accounts' });
+    }
 
-    const totalValue = assets.reduce((sum, asset) => sum + (asset.current_value || 0), 0);
-    const tradingValue = tradingAccounts.reduce((sum, account) => sum + (account.current_value || 0), 0);
+    const assets = assetsResult.data || [];
+    const nominees = nomineesResult.data || [];
+    const tradingAccounts = tradingAccountsResult.data || [];
+
+    console.log('Real data fetched:', {
+      assets: assets.length,
+      nominees: nominees.length,
+      tradingAccounts: tradingAccounts.length
+    });
+
+    // Calculate totals
+    const totalValue = assets.reduce((sum, asset) => sum + (parseFloat(asset.current_value) || 0), 0);
+    const tradingValue = tradingAccounts.reduce((sum, account) => sum + (parseFloat(account.current_value) || 0), 0);
 
     // Calculate asset allocation
     const assetAllocation = assets.map((asset, index) => ({
       name: asset.category || `Asset ${index + 1}`,
-      value: totalValue > 0 ? (asset.current_value / totalValue) * 100 : 0,
-      amount: asset.current_value || 0,
+      value: totalValue > 0 ? (parseFloat(asset.current_value) / totalValue) * 100 : 0,
+      amount: parseFloat(asset.current_value) || 0,
       color: `hsl(${(index * 137.5) % 360}, 70%, 50%)`
     }));
+
+    // Get recent activity (last 10 activities)
+    const { data: recentActivity } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
     res.json({
       totalAssets: assets.length,
@@ -425,11 +455,16 @@ app.get('/api/dashboard/batch', demoTokenMiddleware, async (req, res) => {
       totalValue,
       netWorth: totalValue + tradingValue,
       assetAllocation,
-      recentActivity: [],
+      recentActivity: recentActivity || [],
       assets,
       nominees,
       tradingAccounts
     });
+  } catch (error) {
+    console.error('Dashboard batch error:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
   } catch (error) {
     console.error('Dashboard batch error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
@@ -528,7 +563,7 @@ app.post('/api/assets', demoTokenMiddleware, async (req, res) => {
         user_id: userId,
         category,
         institution,
-        account_number: accountNumber,
+        client_id: accountNumber,
         current_value: currentValue,
         status: status || 'Active',
         notes: notes || '',
@@ -559,7 +594,7 @@ app.put('/api/assets/:id', demoTokenMiddleware, async (req, res) => {
       .update({
         category,
         institution,
-        account_number: accountNumber,
+        client_id: accountNumber,
         current_value: currentValue,
         status,
         notes,
@@ -734,14 +769,14 @@ app.get('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
 app.post('/api/trading-accounts', demoTokenMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { platform, accountNumber, currentValue, status, notes } = req.body;
+    const { broker_name, accountNumber, currentValue, status, notes } = req.body;
 
     const { data: tradingAccount, error } = await supabase
       .from('trading_accounts')
       .insert({
         user_id: userId,
-        platform,
-        account_number: accountNumber,
+        broker_name,
+        client_id: accountNumber,
         current_value: currentValue,
         status: status || 'Active',
         notes: notes || ''
@@ -764,13 +799,13 @@ app.put('/api/trading-accounts/:id', demoTokenMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { platform, accountNumber, currentValue, status, notes } = req.body;
+    const { broker_name, accountNumber, currentValue, status, notes } = req.body;
 
     const { data: tradingAccount, error } = await supabase
       .from('trading_accounts')
       .update({
-        platform,
-        account_number: accountNumber,
+        broker_name,
+        client_id: accountNumber,
         current_value: currentValue,
         status,
         notes
@@ -965,7 +1000,7 @@ const initializeDemoData = async () => {
         user_id: demoUserId,
         category: 'Bank',
         institution: 'State Bank of India',
-        account_number: '****1234',
+        client_id: '****1234',
         current_value: 500000,
         status: 'Active',
         notes: 'Primary savings account',
@@ -975,7 +1010,7 @@ const initializeDemoData = async () => {
         user_id: demoUserId,
         category: 'Mutual Fund',
         institution: 'HDFC Mutual Fund',
-        account_number: 'MF001234',
+        client_id: 'MF001234',
         current_value: 300000,
         status: 'Active',
         notes: 'Equity growth fund',
@@ -985,7 +1020,7 @@ const initializeDemoData = async () => {
         user_id: demoUserId,
         category: 'LIC Policy',
         institution: 'Life Insurance Corporation',
-        account_number: 'LIC123456',
+        client_id: 'LIC123456',
         current_value: 200000,
         status: 'Active',
         notes: 'Term life insurance policy',
@@ -995,7 +1030,7 @@ const initializeDemoData = async () => {
         user_id: demoUserId,
         category: 'Fixed Deposit',
         institution: 'ICICI Bank',
-        account_number: 'FD789012',
+        client_id: 'FD789012',
         current_value: 150000,
         status: 'Active',
         notes: '5-year fixed deposit',
@@ -1031,16 +1066,16 @@ const initializeDemoData = async () => {
     const demoTradingAccounts = [
       {
         user_id: demoUserId,
-        platform: 'Zerodha',
-        account_number: 'ZR123456',
+        broker_name: 'Zerodha',
+        client_id: 'ZR123456',
         current_value: 250000,
         status: 'Active',
         notes: 'Primary trading account'
       },
       {
         user_id: demoUserId,
-        platform: 'Upstox',
-        account_number: 'UP789012',
+        broker_name: 'Upstox',
+        client_id: 'UP789012',
         current_value: 100000,
         status: 'Active',
         notes: 'Secondary trading account'
@@ -1089,7 +1124,7 @@ app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => 
         user_id: demoUserId,
         category: 'Bank',
         institution: 'State Bank of India',
-        account_number: '****1234',
+        client_id: '****1234',
         current_value: 500000,
         status: 'Active',
         notes: 'Primary savings account',
@@ -1099,7 +1134,7 @@ app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => 
         user_id: demoUserId,
         category: 'Mutual Fund',
         institution: 'HDFC Mutual Fund',
-        account_number: 'MF001234',
+        client_id: 'MF001234',
         current_value: 300000,
         status: 'Active',
         notes: 'Equity growth fund',
@@ -1109,7 +1144,7 @@ app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => 
         user_id: demoUserId,
         category: 'LIC Policy',
         institution: 'Life Insurance Corporation',
-        account_number: 'LIC123456',
+        client_id: 'LIC123456',
         current_value: 200000,
         status: 'Active',
         notes: 'Term life insurance policy',
@@ -1119,7 +1154,7 @@ app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => 
         user_id: demoUserId,
         category: 'Fixed Deposit',
         institution: 'ICICI Bank',
-        account_number: 'FD789012',
+        client_id: 'FD789012',
         current_value: 150000,
         status: 'Active',
         notes: '5-year fixed deposit',
@@ -1155,16 +1190,16 @@ app.post('/api/test/create-demo-data', demoTokenMiddleware, async (req, res) => 
     const demoTradingAccounts = [
       {
         user_id: demoUserId,
-        platform: 'Zerodha',
-        account_number: 'ZR123456',
+        broker_name: 'Zerodha',
+        client_id: 'ZR123456',
         current_value: 250000,
         status: 'Active',
         notes: 'Primary trading account'
       },
       {
         user_id: demoUserId,
-        platform: 'Upstox',
-        account_number: 'UP789012',
+        broker_name: 'Upstox',
+        client_id: 'UP789012',
         current_value: 100000,
         status: 'Active',
         notes: 'Secondary trading account'
@@ -1241,7 +1276,7 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
           user_id: req.user.id,
           category: 'Bank',
           institution: 'State Bank of India',
-          account_number: '****1234',
+          client_id: '****1234',
           current_value: 500000,
           status: 'Active',
           notes: 'Primary savings account',
@@ -1252,7 +1287,7 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
           user_id: req.user.id,
           category: 'Mutual Fund',
           institution: 'HDFC Mutual Fund',
-          account_number: 'MF001234',
+          client_id: 'MF001234',
           current_value: 300000,
           status: 'Active',
           notes: 'Equity growth fund',
@@ -1263,7 +1298,7 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
           user_id: req.user.id,
           category: 'LIC Policy',
           institution: 'Life Insurance Corporation',
-          account_number: 'LIC123456',
+          client_id: 'LIC123456',
           current_value: 200000,
           status: 'Active',
           notes: 'Term life insurance policy',
@@ -1274,7 +1309,7 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
           user_id: req.user.id,
           category: 'Fixed Deposit',
           institution: 'ICICI Bank',
-          account_number: 'FD789012',
+          client_id: 'FD789012',
           current_value: 150000,
           status: 'Active',
           notes: '5-year fixed deposit',
@@ -1309,8 +1344,8 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
         {
           id: 'demo-trading-1',
           user_id: req.user.id,
-          platform: 'Zerodha',
-          account_number: 'ZR123456',
+          broker_name: 'Zerodha',
+          client_id: 'ZR123456',
           current_value: 250000,
           status: 'Active',
           notes: 'Primary trading account'
@@ -1318,8 +1353,8 @@ app.get('/api/test/demo-data', demoTokenMiddleware, async (req, res) => {
         {
           id: 'demo-trading-2',
           user_id: req.user.id,
-          platform: 'Upstox',
-          account_number: 'UP789012',
+          broker_name: 'Upstox',
+          client_id: 'UP789012',
           current_value: 100000,
           status: 'Active',
           notes: 'Secondary trading account'
