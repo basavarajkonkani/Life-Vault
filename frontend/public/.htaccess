@@ -1,15 +1,3 @@
-# MIME type fixes
-<IfModule mod_mime.c>
-    AddType text/css .css
-    AddType application/javascript .js
-    AddType application/json .json
-    AddType image/svg+xml .svg
-    AddType image/png .png
-    AddType image/jpeg .jpg .jpeg
-    AddType image/gif .gif
-    AddType image/webp .webp
-</IfModule>
-
 # SPA routing
 <IfModule mod_rewrite.c>
     RewriteEngine On
@@ -20,14 +8,9 @@
     RewriteRule . /index.html [L]
 </IfModule>
 
-# Cache control
-<IfModule mod_expires.c>
-    ExpiresActive on
-    ExpiresByType text/css "access plus 1 year"
-    ExpiresByType application/javascript "access plus 1 year"
-    ExpiresByType image/png "access plus 1 year"
-    ExpiresByType image/jpg "access plus 1 year"
-    ExpiresByType image/jpeg "access plus 1 year"
-    ExpiresByType image/gif "access plus 1 year"
-    ExpiresByType image/svg+xml "access plus 1 year"
+# MIME types
+<IfModule mod_mime.c>
+    AddType text/css .css
+    AddType application/javascript .js
+    AddType application/json .json
 </IfModule>

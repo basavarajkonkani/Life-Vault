@@ -1,3 +1,4 @@
+// Force SPA routing deployment: 2025-09-12T10:20:02.227Z
 // Force rebuild: 2025-09-12T10:17:28.801Z
 import React, { useState } from "react";
 import { Shield, Users, UserCheck, Settings, Mail, Lock, Phone, Eye, EyeOff } from "lucide-react";
