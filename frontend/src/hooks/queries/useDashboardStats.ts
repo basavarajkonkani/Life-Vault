@@ -46,6 +46,127 @@ export const useDashboardStats = () => {
             dashboardAPI.getTradingAccounts().catch(() => [])
           ]);
 
+          
+          // If no data, return demo data
+          if (assets.length === 0 && nominees.length === 0 && tradingAccounts.length === 0) {
+            console.log('No data found, returning demo data');
+            
+            const demoAssets = [
+              {
+                id: 'demo-1',
+                user_id: user.id,
+                category: 'Bank',
+                institution: 'State Bank of India',
+                account_number: '****1234',
+                current_value: 500000,
+                status: 'Active',
+                notes: 'Primary savings account',
+                documents: []
+              },
+              {
+                id: 'demo-2',
+                user_id: user.id,
+                category: 'Mutual Fund',
+                institution: 'HDFC Mutual Fund',
+                account_number: 'MF001234',
+                current_value: 300000,
+                status: 'Active',
+                notes: 'Equity growth fund',
+                documents: []
+              },
+              {
+                id: 'demo-3',
+                user_id: user.id,
+                category: 'LIC Policy',
+                institution: 'Life Insurance Corporation',
+                account_number: 'LIC123456',
+                current_value: 200000,
+                status: 'Active',
+                notes: 'Term life insurance policy',
+                documents: []
+              },
+              {
+                id: 'demo-4',
+                user_id: user.id,
+                category: 'Fixed Deposit',
+                institution: 'ICICI Bank',
+                account_number: 'FD789012',
+                current_value: 150000,
+                status: 'Active',
+                notes: '5-year fixed deposit',
+                documents: []
+              }
+            ];
+
+            const demoNominees = [
+              {
+                id: 'demo-nominee-1',
+                user_id: user.id,
+                name: 'Jane Doe',
+                relation: 'Spouse',
+                phone: '+91 9876543211',
+                email: 'jane@example.com',
+                allocation_percentage: 60,
+                is_executor: true,
+                is_backup: false
+              },
+              {
+                id: 'demo-nominee-2',
+                user_id: user.id,
+                name: 'John Jr',
+                relation: 'Child',
+                phone: '+91 9876543212',
+                email: 'john@example.com',
+                allocation_percentage: 40,
+                is_executor: false,
+                is_backup: false
+              }
+            ];
+
+            const demoTradingAccounts = [
+              {
+                id: 'demo-trading-1',
+                user_id: user.id,
+                platform: 'Zerodha',
+                account_number: 'ZR123456',
+                current_value: 250000,
+                status: 'Active',
+                notes: 'Primary trading account'
+              },
+              {
+                id: 'demo-trading-2',
+                user_id: user.id,
+                platform: 'Upstox',
+                account_number: 'UP789012',
+                current_value: 100000,
+                status: 'Active',
+                notes: 'Secondary trading account'
+              }
+            ];
+
+            const demoTotalValue = demoAssets.reduce((sum, asset) => sum + asset.current_value, 0);
+            const demoTradingValue = demoTradingAccounts.reduce((sum, account) => sum + account.current_value, 0);
+            const demoAssetAllocation = demoAssets.map((asset, index) => ({
+              name: asset.category,
+              value: (asset.current_value / demoTotalValue) * 100,
+              amount: asset.current_value,
+              color: `hsl(${(index * 137.5) % 360}, 70%, 50%)`
+            }));
+
+            return {
+              totalAssets: demoAssets.length,
+              totalNominees: demoNominees.length,
+              totalTradingAccounts: demoTradingAccounts.length,
+              totalValue: demoTotalValue,
+              netWorth: demoTotalValue + demoTradingValue,
+              assetAllocation: demoAssetAllocation,
+              recentActivity: [],
+              assets: demoAssets,
+              nominees: demoNominees,
+              tradingAccounts: demoTradingAccounts
+            };
+          }
+
           // Calculate stats from individual data
           const totalValue = assets.reduce((sum: number, asset: any) => sum + (asset.current_value || 0), 0);
           const assetAllocation = assets.map((asset: any, index: number) => ({
