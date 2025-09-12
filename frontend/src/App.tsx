@@ -119,10 +119,11 @@ const AuthenticatedApp = memo(() => {
 
   return (
     <ResponsiveLayout user={userProfile} onLogout={signOut} navigationItems={navigationItems}>
-                                                      <Routes>
+                                                                      <Routes>
                   <Route path="/" element={<Navigate to="/login" replace />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/*" element={<MainApp />} />
+                  <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
     </ResponsiveLayout>
   );
