@@ -108,9 +108,9 @@ const TradingAccounts: React.FC = () => {
   const handleEdit = (account: any) => {
     setEditingAccount(account);
     setFormData({
-      brokerName: account.broker_name || '',
-      clientId: account.client_id || '',
-      dematNumber: account.demat_number || '',
+      brokerName: account.platform || '',
+      clientId: account.account_number || '',
+      dematNumber: account.account_number || '',
       nomineeId: account.nominee_id || '',
       currentValue: account.current_value?.toString() || '',
       status: account.status || 'Active',
@@ -378,7 +378,7 @@ const TradingAccounts: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {account.broker_name}
+                        {account.platform}
                       </h3>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         account.status === 'Active' 
@@ -388,8 +388,8 @@ const TradingAccounts: React.FC = () => {
                         {account.status}
                       </span>
                     </div>
-                    <p className="text-gray-600 mb-1">Client ID: {account.client_id}</p>
-                    <p className="text-sm text-gray-500 mb-2">Demat: {account.demat_number}</p>
+                    <p className="text-gray-600 mb-1">Client ID: {account.account_number}</p>
+                    <p className="text-sm text-gray-500 mb-2">Demat: {account.account_number}</p>
                     <p className="text-lg font-semibold text-gray-900">
                       {formatCurrency(account.current_value)}
                     </p>
