@@ -216,7 +216,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshSession = async () => {
     try {
       // For demo purposes, just return the demo session
-      return demoSession;
+      console.log("Session refreshed");
     } catch (error) {
       console.error("Error refreshing session:", error);
     }
