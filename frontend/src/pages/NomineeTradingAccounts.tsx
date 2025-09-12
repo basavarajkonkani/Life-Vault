@@ -67,8 +67,8 @@ const NomineeTradingAccounts: React.FC = () => {
     
     try {
       const accountData = {
-        brokerName: formData.brokerName,
-        clientId: formData.clientId,
+        platform: formData.brokerName, // Map brokerName to platform
+        accountNumber: formData.clientId, // Map clientId to accountNumber
         dematNumber: formData.dematNumber,
         nomineeId: formData.nomineeId || null,
         currentValue: parseFloat(formData.currentValue),
